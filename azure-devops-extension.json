@@ -1,0 +1,21 @@
+{
+    "manifestVersion": 1,
+    "id": "current-works-extension",
+    "publisher": "MarcinWojas",
+    "version": "0.0.8",
+    "name": "Current work items",
+    "description": "List of currents Ready/Active and my items in current sprint",
+    "public": false,
+    "categories": ["Azure Repos"],
+    "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],
+    "files": [
+        {
+            "path": "dist",
+            "addressable": true
+        }
+    ]
+}
