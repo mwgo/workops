@@ -5,19 +5,27 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
 import { CommonServiceIds, IHostPageLayoutService } from "azure-devops-extension-api";
+import { ObservableValue } from "azure-devops-ui/Core/Observable";
+import { ISimpleListCell } from "azure-devops-ui/List";
+import { ArrayItemProvider } from "azure-devops-ui/Utilities/Provider";
+
+import { Table } from "azure-devops-ui/Table";
+import {
+    ColumnFill,
+    ISimpleTableCell,
+    renderSimpleCell,
+    TableColumnLayout
+} from "azure-devops-ui/Table";
+import { Card } from "azure-devops-ui/Card";
 
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { IHeaderCommandBarItem } from "azure-devops-ui/HeaderCommandBar";
 import { Page } from "azure-devops-ui/Page";
 import { Tab, TabBar, TabSize } from "azure-devops-ui/Tabs";
 
-// import { OverviewTab } from "./OverviewTab";
-// import { NavigationTab } from "./NavigationTab";
-// import { ExtensionDataTab } from "./ExtensionDataTab";
-// import { MessagesTab } from "./MessagesTab";
 import { showRootComponent } from "../Common";
 
-interface IHubContentState {
+interface ICurrentItemsHubState {
     selectedTabId: string;
     fullScreenMode: boolean;
     headerDescription?: string;
@@ -25,7 +33,13 @@ interface IHubContentState {
     useCompactPivots?: boolean;
 }
 
-class HubContent extends React.Component<{}, IHubContentState> {
+interface ITableItem extends ISimpleTableCell {
+    name: ISimpleListCell;
+    age: number;
+    gender: string;
+}
+
+class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
 
     constructor(props: {}) {
         super(props);
@@ -47,11 +61,11 @@ class HubContent extends React.Component<{}, IHubContentState> {
 
         return (
             <Page className="sample-hub flex-grow">
-                { <Header title="Current Items from Current Sprint"
+                <Header title="Current Work-Items"
                     commandBarItems={this.getCommandBarItems()}
                     description={headerDescription}
                     titleSize={useLargeTitle ? TitleSize.Large : TitleSize.Medium} />
-/*
+
                 <TabBar
                     onSelectedTabChanged={this.onSelectedTabChanged}
                     selectedTabId={selectedTabId}
@@ -61,33 +75,78 @@ class HubContent extends React.Component<{}, IHubContentState> {
                     <Tab name="Navigation" id="navigation" />
                     <Tab name="Extension Data" id="extensionData" />
                     <Tab name="Messages" id="messages" />
-                </TabBar> */}
+                </TabBar>
 
-                { this.getPageContent() }
+                <div className="page-content page-content-top flex-column rhythm-vertical-16">
+                    <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
+                        <Table columns={this.columns} itemProvider={this.sampleData} role="table" />
+                    </Card>
+                </div>
             </Page>
         );
     }
 
+    private columns = [
+        {
+            columnLayout: TableColumnLayout.singleLinePrefix,
+            id: "name",
+            name: "Name",
+            readonly: true,
+            renderCell: renderSimpleCell,
+            width: new ObservableValue(200)
+        },
+        {
+            id: "age",
+            name: "Age",
+            readonly: true,
+            renderCell: renderSimpleCell,
+            width: new ObservableValue(100)
+        },
+        {
+            columnLayout: TableColumnLayout.none,
+            id: "gender",
+            name: "Gender",
+            readonly: true,
+            renderCell: renderSimpleCell,
+            width: new ObservableValue(100)
+        },
+        ColumnFill
+    ];
+    
+    private rawTableItems: ITableItem[] = [
+        {
+            age: 50,
+            gender: "M",
+            name: { /*iconProps: { render: renderStatus },*/ text: "Rory Boisvert" }
+        },
+        {
+            age: 49,
+            gender: "F",
+            name: { iconProps: { iconName: "Home", ariaLabel: "Home" }, text: "Sharon Monroe" }
+        },
+        {
+            age: 18,
+            gender: "F",
+            name: { iconProps: { iconName: "Home", ariaLabel: "Home" }, text: "Lucy Booth" }
+        }
+    ];
+    
+    private sampleData = new ArrayItemProvider<ITableItem>(
+        this.rawTableItems.map((item: ITableItem) => {
+            const newItem = Object.assign({}, item);
+            newItem.name = { text: newItem.name.text };
+            return newItem;
+        })
+    );
+    
+    
+    
+    
+    
     private onSelectedTabChanged = (newTabId: string) => {
         this.setState({
             selectedTabId: newTabId
         })
-    }
-
-    private getPageContent() {
-        // const { selectedTabId } = this.state;
-        // if (selectedTabId === "overview") {
-        //     return <OverviewTab />;
-        // }
-        // else if (selectedTabId === "navigation") {
-        //     return <NavigationTab />;
-        // }
-        // else if (selectedTabId === "extensionData") {
-        //     return <ExtensionDataTab />;
-        // }
-        // else if (selectedTabId === "messages") {
-        //     return <MessagesTab />;
-        // }
     }
 
     private getCommandBarItems(): IHeaderCommandBarItem[] {
@@ -192,4 +251,4 @@ class HubContent extends React.Component<{}, IHubContentState> {
     }
 }
 
-showRootComponent(<HubContent />);
+showRootComponent(<CurrentItemsHub />);
