@@ -2,7 +2,6 @@ import "./CurrentItems.scss";
 
 import "es6-promise/auto";
 import * as React from "react";
-import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
 import { CommonServiceIds, IHostPageLayoutService } from "azure-devops-extension-api";
 import { ObservableValue } from "azure-devops-ui/Core/Observable";
@@ -21,15 +20,11 @@ import { Card } from "azure-devops-ui/Card";
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { IHeaderCommandBarItem } from "azure-devops-ui/HeaderCommandBar";
 import { Page } from "azure-devops-ui/Page";
-import { Tab, TabBar, TabSize } from "azure-devops-ui/Tabs";
 
 import { showRootComponent } from "../Common";
 
 interface ICurrentItemsHubState {
-    selectedTabId: string;
     fullScreenMode: boolean;
-    headerDescription?: string;
-    useLargeTitle?: boolean;
     useCompactPivots?: boolean;
 }
 
@@ -45,7 +40,6 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
         super(props);
 
         this.state = {
-            selectedTabId: "overview",
             fullScreenMode: false
         };
     }
@@ -57,25 +51,11 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
 
     public render(): JSX.Element {
 
-        const { selectedTabId, headerDescription, useCompactPivots, useLargeTitle } = this.state;
-
         return (
             <Page className="sample-hub flex-grow">
                 <Header title="Current Work-Items"
                     commandBarItems={this.getCommandBarItems()}
-                    description={headerDescription}
-                    titleSize={useLargeTitle ? TitleSize.Large : TitleSize.Medium} />
-
-                <TabBar
-                    onSelectedTabChanged={this.onSelectedTabChanged}
-                    selectedTabId={selectedTabId}
-                    tabSize={useCompactPivots ? TabSize.Compact : TabSize.Tall}>
-
-                    <Tab name="Overview" id="overview" />
-                    <Tab name="Navigation" id="navigation" />
-                    <Tab name="Extension Data" id="extensionData" />
-                    <Tab name="Messages" id="messages" />
-                </TabBar>
+                    titleSize={TitleSize.Medium} />
 
                 <div className="page-content page-content-top flex-column rhythm-vertical-16">
                     <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
@@ -143,12 +123,6 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
     
     
     
-    private onSelectedTabChanged = (newTabId: string) => {
-        this.setState({
-            selectedTabId: newTabId
-        })
-    }
-
     private getCommandBarItems(): IHeaderCommandBarItem[] {
         return [
             {
@@ -196,7 +170,6 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
             showCancel: true,
             title: "Message dialog",
             onClose: (result) => {
-                this.setState({ useLargeTitle: result });
             }
         });
     }
@@ -223,13 +196,9 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
             title: "My Panel",
             description: "Description of my panel",
             configuration: {
-                message: "Show header description?",
-                initialValue: !!this.state.headerDescription
+                message: "Show header description?"
             },
             onClose: (result) => {
-                if (result !== undefined) {
-                    this.setState({ headerDescription: result ? "This is a header description" : undefined });
-                }
             }
         });
     }
