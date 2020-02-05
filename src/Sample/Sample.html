@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+ <html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+     <title>Current work items in sprint</title>
+    <script src="lib/VSS.SDK.min.js"></script>
+    <!-- <script src="sdk/scripts/VSS.SDK.js"></script> -->
+    <script type="text/javascript">
+    
+    	VSS.init();
+    	VSS.ready(function() {
+        	// document.getElementById("name").innerText = VSS.getWebContext().user.name;
+    	});
+    </script>
+    <script type="text/javascript">
+        VSS.notifyLoadSucceeded();
+    </script>
+ </head>
+ <body>        
+	<div id="root"></div>
+    <script type="text/javascript" src="Sample.js" charset="utf-8"></script>
+ </body>
+ </html>
