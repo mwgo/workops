@@ -4,34 +4,21 @@ import "es6-promise/auto";
 import * as React from "react";
 import * as SDK from "azure-devops-extension-sdk";
 import { CommonServiceIds, IHostPageLayoutService } from "azure-devops-extension-api";
-import { ObservableValue } from "azure-devops-ui/Core/Observable";
-import { ISimpleListCell } from "azure-devops-ui/List";
-import { ArrayItemProvider } from "azure-devops-ui/Utilities/Provider";
 
-import { Table } from "azure-devops-ui/Table";
-import {
-    ColumnFill,
-    ISimpleTableCell,
-    renderSimpleCell,
-    TableColumnLayout
-} from "azure-devops-ui/Table";
-import { Card } from "azure-devops-ui/Card";
+import { Tab, TabBar, TabSize } from "azure-devops-ui/Tabs";
 
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { IHeaderCommandBarItem } from "azure-devops-ui/HeaderCommandBar";
 import { Page } from "azure-devops-ui/Page";
 
+import { TodoListTab } from "./TodoListTab";
+import { TodoBoardTab } from "./TodoBoardTab";
 import { showRootComponent } from "../Common";
 
 interface ICurrentItemsHubState {
+    selectedTabId: string,
     fullScreenMode: boolean;
     useCompactPivots?: boolean;
-}
-
-interface ITableItem extends ISimpleTableCell {
-    name: ISimpleListCell;
-    age: number;
-    gender: string;
 }
 
 class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
@@ -40,6 +27,7 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
         super(props);
 
         this.state = {
+            selectedTabId: "list",
             fullScreenMode: false
         };
     }
@@ -50,78 +38,40 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
     }
 
     public render(): JSX.Element {
-
         return (
             <Page className="sample-hub flex-grow">
                 <Header title="Current Work-Items"
                     commandBarItems={this.getCommandBarItems()}
                     titleSize={TitleSize.Medium} />
+                <TabBar
+                    onSelectedTabChanged={this.onSelectedTabChanged}
+                    selectedTabId={this.state.selectedTabId}
+                    tabSize={TabSize.Compact}>
 
-                <div className="page-content page-content-top flex-column rhythm-vertical-16">
-                    <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
-                        <Table columns={this.columns} itemProvider={this.sampleData} role="table" />
-                    </Card>
-                </div>
+                    <Tab name="Board" id="board" />
+                    <Tab name="List" id="list" />
+                </TabBar>
+                {this.getPageContent()}
             </Page>
         );
     }
 
-    private columns = [
-        {
-            columnLayout: TableColumnLayout.singleLinePrefix,
-            id: "name",
-            name: "Name",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new ObservableValue(200)
-        },
-        {
-            id: "age",
-            name: "Age",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new ObservableValue(100)
-        },
-        {
-            columnLayout: TableColumnLayout.none,
-            id: "gender",
-            name: "Gender",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new ObservableValue(100)
-        },
-        ColumnFill
-    ];
-    
-    private rawTableItems: ITableItem[] = [
-        {
-            age: 50,
-            gender: "M",
-            name: { /*iconProps: { render: renderStatus },*/ text: "Rory Boisvert" }
-        },
-        {
-            age: 49,
-            gender: "F",
-            name: { iconProps: { iconName: "Home", ariaLabel: "Home" }, text: "Sharon Monroe" }
-        },
-        {
-            age: 18,
-            gender: "F",
-            name: { iconProps: { iconName: "Home", ariaLabel: "Home" }, text: "Lucy Booth" }
-        }
-    ];
-    
-    private sampleData = new ArrayItemProvider<ITableItem>(
-        this.rawTableItems.map((item: ITableItem) => {
-            const newItem = Object.assign({}, item);
-            newItem.name = { text: newItem.name.text };
-            return newItem;
+    private onSelectedTabChanged = (newTabId: string) => {
+        this.setState({
+            selectedTabId: newTabId
         })
-    );
-    
-    
-    
-    
+    }
+
+    private getPageContent() {
+        const { selectedTabId } = this.state;
+        if (selectedTabId === "list") {
+            return <TodoListTab />;
+        }
+        else if (selectedTabId === "board") {
+            return <TodoBoardTab />;
+        }
+    }
+
     
     private getCommandBarItems(): IHeaderCommandBarItem[] {
         return [
