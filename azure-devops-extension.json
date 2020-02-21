@@ -2,10 +2,11 @@
     "manifestVersion": 1,
     "id": "current-works-extension",
     "publisher": "MarcinWojas",
-    "version": "0.0.18",
+    "version": "0.0.22",
     "name": "Current work items",
     "description": "List of currents Ready/Active and my items in current sprint",
     "public": false,
+    "baseUri": "https://localhost:44300/",
     "categories": ["Azure Repos"],
     "targets": [
         {

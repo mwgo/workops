@@ -49,7 +49,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             projects.map((item: TeamProjectReference) => {
                 return {
                     id: item.id,
-                    name: item.name
+                    name: item.name.toUpperCase()
                 };
             })
         );
