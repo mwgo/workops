@@ -9,24 +9,19 @@ import {
 import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 import * as TfsWork from "azure-devops-extension-api/Work/WorkClient";
-import * as Work from "azure-devops-extension-api/Work/Work";
-
-import * as UiCore from "azure-devops-ui/Core/Observable";
-import { ArrayItemProvider } from "azure-devops-ui/Utilities/Provider";
 
 import { Card } from "azure-devops-ui/Card";
-import {
-    Table,
-    ISimpleTableCell,
-    TableColumnLayout,
-    renderSimpleCell,
-    ColumnFill
-} from "azure-devops-ui/Table";
+import { ColumnMore, ISimpleTableCell } from "azure-devops-ui/Table";
+
+import { Tree } from "azure-devops-ui/TreeEx";
+import { ITreeItem, ITreeItemEx, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
+import { renderExpandableTreeCell, renderTreeCell } from "azure-devops-ui/TreeEx";
+
 import { Dropdown } from "azure-devops-ui/Dropdown";
 import { DropdownSelection } from "azure-devops-ui/Utilities/DropdownSelection";
 import { IListBoxItem } from "azure-devops-ui/ListBox";
 
-interface ITableItem extends ISimpleTableCell {
+interface IWorkItem extends ISimpleTableCell {
     id: string;
     title: string;
     state: string;
@@ -39,8 +34,22 @@ interface IIterationItem {
 }
 
 export interface ITodoListTabState {
-    workItems: ArrayItemProvider<ITableItem>;
+    workItems: TreeItemProvider<IWorkItem>;
     iterations: IListBoxItem<IIterationItem>[];
+}
+
+declare global {
+    interface Array<T> {
+        first(predicate: (value: T, index: number, obj: T[]) => any): T;
+    }  
+}
+
+if (!Array.prototype.first) {
+    Array.prototype.first = function<T>(predicate: (value: T, index: number, obj: T[]) => any) {
+        let idx = this.findIndex(predicate);
+        if (idx<0) throw "Item not found";
+        return this[idx];
+    };
 }
 
 export class TodoListTab extends React.Component<{}, ITodoListTabState> {
@@ -53,7 +62,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
         this.state = {
             iterations: [],
-            workItems: new ArrayItemProvider<ITableItem>([])
+            workItems: new TreeItemProvider<IWorkItem>([])
         };
     }
 
@@ -69,7 +78,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
         this.setState({
             iterations: await this.loadIterations(),
-            workItems: new ArrayItemProvider<ITableItem>(await this.loadItems())
+            workItems: new TreeItemProvider<IWorkItem>(await this.loadItems())
         });
 
         this.updateIterationIndex();
@@ -105,23 +114,23 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         });
     }
 
-    private async loadItems(): Promise<ITableItem[]> {
+    private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
         if (!this.currentProject) return [];
         
-        const client = getClient(TfsWIT.WorkItemTrackingRestClient);
-
-        let iter: string;
-        if (this.currentIterationPath)
-            iter = "'"+this.currentIterationPath+"'";
-        else
-            iter = "@CurrentIteration";
-
-        let topWiql = {
-            query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Target].[Iteration Path]="+iter+
-                        " AND [Target].[System.WorkItemType]='Task'"+
-                        " AND [Target].[System.State] IN ('Ready', 'Active')"
-        };
         try {
+            const client = getClient(TfsWIT.WorkItemTrackingRestClient);
+
+            let iter: string;
+            if (this.currentIterationPath)
+                iter = "'"+this.currentIterationPath+"'";
+            else
+                iter = "@CurrentIteration";
+    
+            let topWiql = {
+                query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Target].[Iteration Path]="+iter+
+                            " AND [Target].[System.WorkItemType]='Task'"+
+                            " AND [Target].[System.State] IN ('Ready', 'Active')"
+            };
             let topRels = await client.queryByWiql(topWiql, this.currentProject.id);
             if (!topRels) return [];
 
@@ -136,22 +145,43 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             let items = await client.getWorkItems(topItems.concat(childrenItems), this.currentProject.id);
 
             let roots = items
-                // .filter(it => it.fields["System.WorkItemType"]!="Task")
-                .map(it => {
-                    let assigned = it.fields["System.AssignedTo"];
-                    return {
-                        id: it.id.toString(),
-                        title: it.fields["System.Title"] as string,
-                        state: it.fields["System.State"] as string,
-                        assignedTo: (assigned ? assigned.displayName : "") as string,
-                    };
-                });
+                .filter(it => it.fields["System.WorkItemType"]!="Task")
+                .map(it => ({
+                    childItems: this.getTreeChildren(it, items, childrenRels.workItemRelations),
+                    data: this.getTreeItem(it),
+                    expanded: true
+                }));
 
             return roots;
         }
         catch (e) {
             return [];
         }
+    }
+
+    private getTreeItem(it: TfsWIT.WorkItem): IWorkItem {
+        let assigned = it.fields["System.AssignedTo"];
+        return {
+            id: it.id.toString(),
+            title: it.fields["System.Title"] as string,
+            state: it.fields["System.State"] as string,
+            assignedTo: (assigned ? assigned.displayName : "") as string
+        };
+    }
+
+    private getTreeChildren(item: TfsWIT.WorkItem, items: TfsWIT.WorkItem[], links: TfsWIT.WorkItemLink[]): ITreeItem<IWorkItem>[] | undefined {
+        if (item.fields["System.WorkItemType"]=="Task") return undefined;
+
+        let children = links
+            .filter(l => l.source && l.target && l.source.id==item.id)
+            .map(l => items.first(it => it.id==l.target.id))
+            .map(it => ({
+                childItems: it ? this.getTreeChildren(it, items, links) : [],
+                data: this.getTreeItem(it),
+                expanded: true
+            }));
+
+        return children;
     }
 
     private updateIterationIndex(): void {
@@ -161,61 +191,27 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
     private async reloadItems(): Promise<void> {
         this.setState({
-            workItems: new ArrayItemProvider<ITableItem>(await this.loadItems())
+            workItems: new TreeItemProvider<IWorkItem>(await this.loadItems())
         });
-    }
-
-    private async loadSample() {
-        const navService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
-        const proj = await navService.getProject();
-        if (!proj) return;
-
-        let client = getClient(TfsWIT.WorkItemTrackingRestClient);
-        let coreClient = getClient(TfsCore.CoreRestClient);
-        let workClient = getClient(TfsWork.WorkRestClient);
-
-        let settings = await workClient.getTeamSettings({ projectId: proj.id, teamId: "", project: "", team: "" });
-        var iteration = settings.defaultIteration;
-        
-        let teams = await coreClient.getTeams(proj.id, true, 50);
-        let team = teams[0];
-
-        let teamContext: TfsCore.TeamContext = { projectId: proj.id, teamId: team.id, project: "", team: "" };
-
-        let iterations = await workClient.getTeamIterations(teamContext);
     }
 
     private columns = [
         {
-            columnLayout: TableColumnLayout.singleLinePrefix,
-            id: "id",
-            name: "ID",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new UiCore.ObservableValue(70)
-        },
-        {
             id: "title",
             name: "Title",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new UiCore.ObservableValue(400)
-        },
-        {
+            renderCell: renderExpandableTreeCell,
+            width: 400
+        },{
             id: "state",
             name: "State",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new UiCore.ObservableValue(100)
-        },
-        {
+            renderCell: renderTreeCell,
+            width: 100
+        },{
             id: "assignedTo",
             name: "Assigned To",
-            readonly: true,
-            renderCell: renderSimpleCell,
-            width: new UiCore.ObservableValue(300)
-        },
-        ColumnFill
+            renderCell: renderTreeCell,
+            width: 300
+        }
     ];
 
     private iterationSelection = new DropdownSelection();
@@ -225,7 +221,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         this.updateIterationIndex();
         this.reloadItems();
     };
-    
+
     public render(): JSX.Element {
         return (
             <div className="page-content page-content-top flex-column rhythm-vertical-16">
@@ -240,7 +236,16 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                     />
                 </span>
                 <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
-                    <Table columns={this.columns} itemProvider={this.state.workItems} role="table" />
+
+                    <Tree<IWorkItem>
+                        columns={this.columns}
+                        itemProvider={this.state.workItems}
+                        onToggle={(event, treeItem: ITreeItemEx<IWorkItem>) => {
+                            this.state.workItems.toggle(treeItem.underlyingItem);
+                        }}
+                        scrollable={true}
+                    />
+
                 </Card>
             </div>
         );

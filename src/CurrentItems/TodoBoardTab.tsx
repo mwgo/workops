@@ -85,6 +85,26 @@ export class TodoBoardTab extends React.Component<{}, ITodoBoardTabState> {
         }
     ];
     
+    // private async loadSample() {
+    //     const navService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
+    //     const proj = await navService.getProject();
+    //     if (!proj) return;
+
+    //     let client = getClient(TfsWIT.WorkItemTrackingRestClient);
+    //     let coreClient = getClient(TfsCore.CoreRestClient);
+    //     let workClient = getClient(TfsWork.WorkRestClient);
+
+    //     let settings = await workClient.getTeamSettings({ projectId: proj.id, teamId: "", project: "", team: "" });
+    //     var iteration = settings.defaultIteration;
+        
+    //     let teams = await coreClient.getTeams(proj.id, true, 50);
+    //     let team = teams[0];
+
+    //     let teamContext: TfsCore.TeamContext = { projectId: proj.id, teamId: team.id, project: "", team: "" };
+
+    //     let iterations = await workClient.getTeamIterations(teamContext);
+    // }
+
     private sampleData = new ArrayItemProvider<ITableItem>(
         this.rawTableItems.map((item: ITableItem) => {
             const newItem = Object.assign({}, item);
