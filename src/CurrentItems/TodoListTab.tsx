@@ -9,6 +9,7 @@ import {
 import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 import * as TfsWork from "azure-devops-extension-api/Work/WorkClient";
+import * as TfsW from "azure-devops-extension-api/Work";
 
 import { Card } from "azure-devops-ui/Card";
 import { ColumnMore, ISimpleTableCell } from "azure-devops-ui/Table";
@@ -28,7 +29,7 @@ interface IWorkItem extends ISimpleTableCell {
     title: ISimpleListCell;
     state: ISimpleListCell;
     assignedTo: string;
-    teamProject: string;
+    area: string;
 }
 
 interface IIterationItem {
@@ -106,17 +107,23 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         let settings = await workClient.getTeamSettings({ projectId: this.currentProject.id, teamId: "", project: "", team: "" });
         this.currentIterationPath = this.currentProject.name + settings.defaultIteration.path;
 
+        let iterations: TfsW.TeamSettingsIteration[] = [];
         let teams = await coreClient.getTeams(this.currentProject.id, true, 50);
-        let team = teams[0];
+        for (const team of teams) {
+            let teamContext: TfsCore.TeamContext = { projectId: this.currentProject.id, teamId: team.id, project: "", team: "" };
+            iterations = iterations.concat(await workClient.getTeamIterations(teamContext));                
+        }
 
-        let teamContext: TfsCore.TeamContext = { projectId: this.currentProject.id, teamId: team.id, project: "", team: "" };
-
-        let iterations = await workClient.getTeamIterations(teamContext);
+        let dt = Date.now();
+        let iter = iterations.first(i => i.attributes.startDate.getTime()<=dt && dt<=i.attributes.finishDate.getTime());
+        if (iter)
+            this.currentIterationPath = iter.path;
 
         return iterations.map(it => { 
             let sufix = "";
-            if (it.attributes && it.attributes.finishDate) sufix += " -> " + it.attributes.finishDate.toDateString();
-            if (settings.defaultIteration.id==it.id) sufix += " (Current)";
+            if (it.attributes && it.attributes.startDate.getTime()<=dt && dt<=it.attributes.finishDate.getTime()) 
+                sufix += " -> " + it.attributes.finishDate.toDateString();
+            if (this.currentIterationPath==it.path) sufix += " (Current)";
             return { id: it.path, text: it.name+sufix }; 
         });
     }
@@ -134,14 +141,17 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                 iter = "@CurrentIteration";
     
             let topWiql = {
-                query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Target].[Iteration Path]="+iter+
+                query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
+                            " AND [Target].[System.AssignedTo]=@me"+
+                            " AND [Target].[Iteration Path]="+iter+
                             " AND [Target].[System.WorkItemType]='Task'"+
                             " AND [Target].[System.State] IN ('Ready', 'Active')"
             };
             let topRels = await client.queryByWiql(topWiql, this.currentProject.id);
-            if (!topRels) return [];
+            if (!topRels || !topRels.workItemRelations) return [];
 
             let topItems = topRels.workItemRelations.filter(item => !item.rel).map(item => item.target.id);
+            if (!topItems || topItems.length==0) return [];
 
             let childrenWiql = {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
@@ -205,7 +215,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                 iconProps: stateIcon
             },
             assignedTo: (assigned ? assigned.displayName : "") as string,
-            teamProject: it.fields["System.TeamProject"] as string
+            area: it.fields["System.AreaPath"] as string
         };
     }
 
@@ -252,8 +262,8 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             renderCell: renderTreeCell,
             width: 200
         },{
-            id: "teamProject",
-            name: "Team Project",
+            id: "area",
+            name: "Area",
             renderCell: renderTreeCell,
             width: 200
         }
