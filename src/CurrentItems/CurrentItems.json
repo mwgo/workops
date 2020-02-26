@@ -14,7 +14,11 @@
             ],
             "properties": {
                 "name": "Current Work",
-                "uri": "dist/CurrentItems/CurrentItems.html"
+                "uri": "dist/CurrentItems/CurrentItems.html",
+                "icon": {
+                    "light": "static/task-list.png",
+                    "dark": "static/task-list.png"
+                }
             }
         }
     ]

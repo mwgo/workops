@@ -12,6 +12,7 @@ import * as TfsWork from "azure-devops-extension-api/Work/WorkClient";
 
 import { Card } from "azure-devops-ui/Card";
 import { ColumnMore, ISimpleTableCell } from "azure-devops-ui/Table";
+import { ISimpleListCell } from "azure-devops-ui/List";
 
 import { Tree } from "azure-devops-ui/TreeEx";
 import { ITreeItem, ITreeItemEx, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
@@ -20,12 +21,14 @@ import { renderExpandableTreeCell, renderTreeCell } from "azure-devops-ui/TreeEx
 import { Dropdown } from "azure-devops-ui/Dropdown";
 import { DropdownSelection } from "azure-devops-ui/Utilities/DropdownSelection";
 import { IListBoxItem } from "azure-devops-ui/ListBox";
+import { IIconProps } from "azure-devops-ui/Icon";
 
 interface IWorkItem extends ISimpleTableCell {
     id: string;
-    title: string;
-    state: string;
+    title: ISimpleListCell;
+    state: ISimpleListCell;
     assignedTo: string;
+    teamProject: string;
 }
 
 interface IIterationItem {
@@ -50,6 +53,10 @@ if (!Array.prototype.first) {
         if (idx<0) throw "Item not found";
         return this[idx];
     };
+}
+
+interface IIconPropsMap {
+    [key: string]: IIconProps;
 }
 
 export class TodoListTab extends React.Component<{}, ITodoListTabState> {
@@ -159,13 +166,46 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         }
     }
 
+    private static TypesMap: IIconPropsMap = {
+        "": { iconName: "SkypeCircleCheck" },
+        "Feature": { iconName: "Trophy2Solid", style: { color: "#773B93"} },
+        "Bug": { iconName: "LadybugSolid", style: { color: "#CC293D"} }, 
+        "Task": { iconName: "TaskSolid", style: { color: "#F2CB1D"} },
+        "User Story": { iconName: "ReadingModeSolid", style: { color: "#009CCC"} }
+    };
+
+    private static StatesMap: IIconPropsMap = {
+        "": { iconName: "StatusCircleInner", style: { color: "#000000"} },
+        "New": { iconName: "StatusCircleInner", style: { color: "#b2b2b2"} },
+        "Active": { iconName: "StatusCircleInner", style: { color: "#007acc"} },
+        "Ready": { iconName: "StatusCircleInner", style: { color: "#007acc"} },
+        "Completed": { iconName: "StatusCircleInner", style: { color: "#5688e0"} },
+        "Resolved": { iconName: "StatusCircleInner", style: { color: "#5688e0"} },
+        "Closed": { iconName: "StatusCircleInner", style: { color: "#339933"} },
+        "Removed": { iconName: "StatusCircleRing", style: { color: "#b2b2b2"} },
+    };
+
     private getTreeItem(it: TfsWIT.WorkItem): IWorkItem {
         let assigned = it.fields["System.AssignedTo"];
+
+        let typeName = it.fields["System.WorkItemType"] as string;
+        let typeIcon = TodoListTab.TypesMap[typeName] || TodoListTab.TypesMap[""];
+
+        let state = it.fields["System.State"] as string;
+        let stateIcon = TodoListTab.StatesMap[state] || TodoListTab.StatesMap[""];
+        
         return {
             id: it.id.toString(),
-            title: it.fields["System.Title"] as string,
-            state: it.fields["System.State"] as string,
-            assignedTo: (assigned ? assigned.displayName : "") as string
+            title: { 
+                text: it.fields["System.Title"] as string,
+                iconProps: typeIcon
+            },
+            state: {
+                text: state,
+                iconProps: stateIcon
+            },
+            assignedTo: (assigned ? assigned.displayName : "") as string,
+            teamProject: it.fields["System.TeamProject"] as string
         };
     }
 
@@ -210,7 +250,12 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             id: "assignedTo",
             name: "Assigned To",
             renderCell: renderTreeCell,
-            width: 300
+            width: 200
+        },{
+            id: "teamProject",
+            name: "Team Project",
+            renderCell: renderTreeCell,
+            width: 200
         }
     ];
 
@@ -222,6 +267,11 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         this.reloadItems();
     };
 
+    private async openWorkItemClick(id: string) {
+        const navSvc = await SDK.getService<TfsWIT.IWorkItemFormNavigationService>(TfsWIT.WorkItemTrackingServiceIds.WorkItemFormNavigationService);
+        navSvc.openWorkItem(parseInt(id));
+    };
+    
     public render(): JSX.Element {
         return (
             <div className="page-content page-content-top flex-column rhythm-vertical-16">
@@ -243,6 +293,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                         onToggle={(event, treeItem: ITreeItemEx<IWorkItem>) => {
                             this.state.workItems.toggle(treeItem.underlyingItem);
                         }}
+                        onSelect={(event, item) => this.openWorkItemClick(item.data.underlyingItem.data.id)}
                         scrollable={true}
                     />
 
