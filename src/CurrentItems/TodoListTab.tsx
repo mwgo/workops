@@ -5,21 +5,25 @@ import {
     CommonServiceIds, 
     IProjectPageService,
     IProjectInfo
- } from "azure-devops-extension-api";
+} from "azure-devops-extension-api";
 import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
-import * as TfsWork from "azure-devops-extension-api/Work/WorkClient";
-import * as TfsW from "azure-devops-extension-api/Work";
+import * as TfsClient from "azure-devops-extension-api/Work/WorkClient";
+import * as TfsWork from "azure-devops-extension-api/Work";
 
 import { Card } from "azure-devops-ui/Card";
-import { ColumnMore, ISimpleTableCell } from "azure-devops-ui/Table";
+import { ISimpleTableCell } from "azure-devops-ui/Table";
 import { ISimpleListCell } from "azure-devops-ui/List";
 
 import { Tree } from "azure-devops-ui/TreeEx";
 import { ITreeItem, ITreeItemEx, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
 import { renderExpandableTreeCell, renderTreeCell } from "azure-devops-ui/TreeEx";
 
-import { Dropdown } from "azure-devops-ui/Dropdown";
+import { FilterBar } from "azure-devops-ui/FilterBar";
+import { KeywordFilterBarItem } from "azure-devops-ui/TextFilterBarItem";
+import { DropdownFilterBarItem } from "azure-devops-ui/Dropdown";
+import { Filter, FILTER_CHANGE_EVENT } from "azure-devops-ui/Utilities/Filter";
+
 import { DropdownSelection } from "azure-devops-ui/Utilities/DropdownSelection";
 import { IListBoxItem } from "azure-devops-ui/ListBox";
 import { IIconProps } from "azure-devops-ui/Icon";
@@ -30,6 +34,7 @@ interface IWorkItem extends ISimpleTableCell {
     state: ISimpleListCell;
     assignedTo: string;
     area: string;
+    priority: number;
 }
 
 interface IIterationItem {
@@ -37,7 +42,7 @@ interface IIterationItem {
     text: string;
 }
 
-export interface ITodoListTabState {
+interface ITodoListTabState {
     workItems: TreeItemProvider<IWorkItem>;
     iterations: IListBoxItem<IIterationItem>[];
 }
@@ -62,11 +67,17 @@ interface IIconPropsMap {
 
 export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
+    private filter: Filter;
+    private iterationList = new DropdownSelection();
+
     private currentProject?: IProjectInfo;
     private currentIterationPath: string = "";
 
     constructor(props: {}) {
         super(props);
+
+        this.filter = new Filter();
+        this.filter.subscribe(() => this.filterChanged(), FILTER_CHANGE_EVENT);
 
         this.state = {
             iterations: [],
@@ -76,6 +87,15 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
     public componentDidMount() {
         this.initializeState();
+    }
+
+    private filterChanged(): void {
+        let idx = this.iterationList.value[0].beginIndex;
+        if (this.state.iterations[idx].id!=this.currentIterationPath) {
+            this.currentIterationPath = this.state.iterations[idx].id;
+            this.updateIterationIndex();
+            this.reloadItems();
+        }
     }
 
     private async initializeState(): Promise<void> {
@@ -102,30 +122,43 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         if (!this.currentProject) return [];
 
         let coreClient = getClient(TfsCore.CoreRestClient);
-        let workClient = getClient(TfsWork.WorkRestClient);
+        let workClient = getClient(TfsClient.WorkRestClient);
 
-        let settings = await workClient.getTeamSettings({ projectId: this.currentProject.id, teamId: "", project: "", team: "" });
-        this.currentIterationPath = this.currentProject.name + settings.defaultIteration.path;
-
-        let iterations: TfsW.TeamSettingsIteration[] = [];
+        let projectId = this.currentProject.id;
         let teams = await coreClient.getTeams(this.currentProject.id, true, 50);
-        for (const team of teams) {
-            let teamContext: TfsCore.TeamContext = { projectId: this.currentProject.id, teamId: team.id, project: "", team: "" };
-            iterations = iterations.concat(await workClient.getTeamIterations(teamContext));                
+        let titerations = await Promise.all(teams.map(team => {
+            let teamContext: TfsCore.TeamContext = { projectId: projectId, teamId: team.id, project: "", team: "" };
+            return workClient.getTeamIterations(teamContext);
+        }));
+
+        let time = new Date().getTime() - 40*24*60*60*1000;
+        let iterations: TfsWork.TeamSettingsIteration[] = [];
+        for (const tit of titerations) {
+            for (const it of tit) {
+                if (!it.attributes.finishDate || it.attributes.finishDate.getTime()>time) 
+                    if (iterations.findIndex(i => it.id==i.id)<=0)
+                        iterations.push(it);
+            }
         }
 
-        let dt = Date.now();
-        let iter = iterations.first(i => i.attributes.startDate.getTime()<=dt && dt<=i.attributes.finishDate.getTime());
-        if (iter)
-            this.currentIterationPath = iter.path;
+        let iter = iterations.first(i => TodoListTab.isCurrentIteration(i));
+        this.currentIterationPath = iter ? iter.path : "";
 
         return iterations.map(it => { 
             let sufix = "";
-            if (it.attributes && it.attributes.startDate.getTime()<=dt && dt<=it.attributes.finishDate.getTime()) 
-                sufix += " -> " + it.attributes.finishDate.toDateString();
             if (this.currentIterationPath==it.path) sufix += " (Current)";
-            return { id: it.path, text: it.name+sufix }; 
+            return { 
+                id: it.path, 
+                text: it.name+sufix,
+                iconProps: { iconName: "Sprint" }
+            }; 
         });
+    }
+
+    private static isCurrentIteration(iter: TfsWork.TeamSettingsIteration): boolean {
+        let dt = Date.now();
+        return (!iter.attributes.startDate || iter.attributes.startDate.getTime()<=dt) 
+            && (!iter.attributes.finishDate || dt<=iter.attributes.finishDate.getTime());
     }
 
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
@@ -147,11 +180,23 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                             " AND [Target].[System.WorkItemType]='Task'"+
                             " AND [Target].[System.State] IN ('Ready', 'Active')"
             };
-            let topRels = await client.queryByWiql(topWiql, this.currentProject.id);
-            if (!topRels || !topRels.workItemRelations) return [];
+            let topWiql2 = {
+                query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]=@me"+
+                            " AND [Iteration Path]="+iter+
+                            " AND [System.WorkItemType] IN ('Bug', 'User Story')"+
+                            " AND [System.State] IN ('Ready', 'Active')"
+            };
 
-            let topItems = topRels.workItemRelations.filter(item => !item.rel).map(item => item.target.id);
-            if (!topItems || topItems.length==0) return [];
+            let top = await Promise.all([
+                client.queryByWiql(topWiql, this.currentProject.id),
+                client.queryByWiql(topWiql2, this.currentProject.id)
+            ]);
+
+            if (!top[0] || !top[1]) return [];
+
+            let topItems = top[0].workItemRelations.filter(item => !item.rel).map(item => item.target.id);
+            topItems = topItems.concat(top[1].workItems.map(item => item.id));
+            if (topItems.length==0) return [];
 
             let childrenWiql = {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
@@ -161,15 +206,15 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             
             let items = await client.getWorkItems(topItems.concat(childrenItems), this.currentProject.id);
 
-            let roots = items
+            let result = items
                 .filter(it => it.fields["System.WorkItemType"]!="Task")
                 .map(it => ({
                     childItems: this.getTreeChildren(it, items, childrenRels.workItemRelations),
                     data: this.getTreeItem(it),
-                    expanded: true
+                    expanded: false
                 }));
 
-            return roots;
+            return result;
         }
         catch (e) {
             return [];
@@ -203,7 +248,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
         let state = it.fields["System.State"] as string;
         let stateIcon = TodoListTab.StatesMap[state] || TodoListTab.StatesMap[""];
-        
+
         return {
             id: it.id.toString(),
             title: { 
@@ -215,7 +260,8 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                 iconProps: stateIcon
             },
             assignedTo: (assigned ? assigned.displayName : "") as string,
-            area: it.fields["System.AreaPath"] as string
+            area: it.fields["System.AreaPath"] as string,
+            priority: it.fields["Microsoft.VSTS.Common.Priority"] as number
         };
     }
 
@@ -228,7 +274,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             .map(it => ({
                 childItems: it ? this.getTreeChildren(it, items, links) : [],
                 data: this.getTreeItem(it),
-                expanded: true
+                expanded: false
             }));
 
         return children;
@@ -236,7 +282,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
     private updateIterationIndex(): void {
         let idx = this.state.iterations.findIndex(it => it.id==this.currentIterationPath);
-        if (idx>=0) this.iterationSelection.select(idx);
+        if (idx>=0) this.iterationList.select(idx);
     }
 
     private async reloadItems(): Promise<void> {
@@ -269,32 +315,30 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         }
     ];
 
-    private iterationSelection = new DropdownSelection();
-    
-    private iterationSelect = (event: React.SyntheticEvent<HTMLElement>, item: IListBoxItem<IIterationItem>) => {
-        this.currentIterationPath = item.id;
-        this.updateIterationIndex();
-        this.reloadItems();
-    };
-
     private async openWorkItemClick(id: string) {
         const navSvc = await SDK.getService<TfsWIT.IWorkItemFormNavigationService>(TfsWIT.WorkItemTrackingServiceIds.WorkItemFormNavigationService);
         navSvc.openWorkItem(parseInt(id));
     };
-    
+
     public render(): JSX.Element {
         return (
             <div className="page-content page-content-top flex-column rhythm-vertical-16">
-                <span>
-                    Iteration: 
-                    <Dropdown
-                        placeholder="Select an Iteration"
+                <FilterBar filter={this.filter}>
+
+                    <KeywordFilterBarItem filterItemKey="Placeholder" />
+
+                    <DropdownFilterBarItem
+                        filterItemKey="iterationList"
+                        filter={this.filter}
                         items={this.state.iterations}
-                        onSelect={this.iterationSelect}
-                        selection={this.iterationSelection}
-                        width={400}
+                        selection={this.iterationList}
+                        placeholder="Iteration"
+                        showPlaceholderAsLabel={false}
+                        hideClearAction={true}
                     />
-                </span>
+
+                </FilterBar>
+
                 <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
 
                     <Tree<IWorkItem>
