@@ -118,7 +118,10 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                         onToggle={(event, treeItem) => {
                             this.data.WorkItemsProvider.toggle(treeItem.underlyingItem);
                         }}
-                        onSelect={(event, item) => this.openWorkItemClick(item.data.underlyingItem.data.id)}
+                        onSelect={(event, item) => {
+                            this.openWorkItemClick(item.data.underlyingItem.data.id);
+                            event.preventDefault();
+                        }}
                         scrollable={true}
                     />
 

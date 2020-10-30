@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "current-works-extension",
     "publisher": "MarcinWojas",
-    "version": "0.0.56",
+    "version": "0.0.69",
     "name": "Current work items",
     "description": "List of currents Ready/Active and my items in current sprint",
     "scopes": [
@@ -10,7 +10,7 @@
         "vso.work_full"
     ],
     "public": false,
-    "baseUri": "https://localhost:44300/",
+    "baseUri": "http://localhost:44300/",
     "categories": ["Azure Repos"],
     "targets": [
         {

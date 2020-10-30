@@ -43,14 +43,14 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
                 <Header title="Current Work-Items"
                     commandBarItems={this.getCommandBarItems()}
                     titleSize={TitleSize.Medium} />
-                <TabBar
+                {/* <TabBar
                     onSelectedTabChanged={this.onSelectedTabChanged}
                     selectedTabId={this.state.selectedTabId}
                     tabSize={TabSize.Compact}>
 
                     <Tab name="Board" id="board" />
                     <Tab name="List" id="list" />
-                </TabBar>
+                </TabBar> */}
                 {this.getPageContent()}
             </Page>
         );

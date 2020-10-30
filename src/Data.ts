@@ -112,8 +112,15 @@ export class Data {
 
     private static isCurrentIteration(iter: TfsWork.TeamSettingsIteration): boolean {
         let dt = Date.now();
-        return (!iter.attributes.startDate || iter.attributes.startDate.getTime()<=dt) 
-            && (!iter.attributes.finishDate || dt<=iter.attributes.finishDate.getTime());
+        
+        let start = iter.attributes.startDate;
+        if (!start) start = new Date();
+
+        let finish = iter.attributes.finishDate;
+        if (!finish) finish = new Date();
+        finish.setDate(finish.getDate()+1);
+
+        return start.getTime()<=dt && dt<finish.getTime();
     }
 
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
@@ -138,7 +145,7 @@ export class Data {
             let topWiql2 = {
                 query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]=@me"+
                             " AND [Iteration Path]="+iter+
-                            " AND [System.WorkItemType] IN ('Bug', 'User Story')"+
+                            " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
                             " AND [System.State] IN ('Ready', 'Active')"
             };
 

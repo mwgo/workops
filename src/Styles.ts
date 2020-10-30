@@ -11,7 +11,8 @@ export class Styles {
         "Feature": { iconName: "Trophy2Solid", style: { color: "#773B93"} },
         "Bug": { iconName: "LadybugSolid", style: { color: "#CC293D"} }, 
         "Task": { iconName: "TaskSolid", style: { color: "#F2CB1D"} },
-        "User Story": { iconName: "ReadingModeSolid", style: { color: "#009CCC"} }
+        "User Story": { iconName: "ReadingModeSolid", style: { color: "#009CCC"} },
+        "Impediment": { iconName: "ConstructionConeSolid", style: { color: "#CC293D"} }
     };
 
     static StatesMap: IIconPropsMap = {
