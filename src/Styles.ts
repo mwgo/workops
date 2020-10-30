@@ -6,6 +6,8 @@ interface IIconPropsMap {
 
 export class Styles {
 
+    static LoadingIcon: IIconProps = { iconName: "ProgressRingDots", style: { color: "#000000"} };
+
     static TypesMap: IIconPropsMap = {
         "": { iconName: "SkypeCircleCheck" },
         "Feature": { iconName: "Trophy2Solid", style: { color: "#773B93"} },

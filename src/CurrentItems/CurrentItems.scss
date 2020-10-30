@@ -4,6 +4,18 @@
     font-size: $fontSizeM;
 }
 
-.currentlist-alien-text {
+.currentlist-text {
+    font-weight: inherit;
+}
+
+.currentlist-active-text {
     color: rgb(168, 167, 167);
+}
+
+.currentlist-my-text {
+    font-weight: bolder;
+}
+.currentlist-active-my-text {
+    color: rgb(168, 167, 167);
+    font-weight: bolder;
 }

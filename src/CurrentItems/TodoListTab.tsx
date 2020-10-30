@@ -60,8 +60,8 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         }
 
         let tf = this.tasksFilter.value[0].beginIndex;
-        if (this.data.TaskFilter!=this.data.TaskFilterValaues[tf]) {
-            this.data.TaskFilter = this.data.TaskFilterValaues[tf];
+        if (this.data.TaskFilter!=Data.TaskFilterValaues[tf]) {
+            this.data.TaskFilter = Data.TaskFilterValaues[tf];
             this.updateTaskFilter();
             changed = true;
         }
@@ -78,7 +78,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
     }
 
     private updateTaskFilter(): void {
-        let idx = this.data.TaskFilterValaues.findIndex(it => it==this.data.TaskFilter);
+        let idx = Data.TaskFilterValaues.findIndex(it => it==this.data.TaskFilter);
         if (idx>=0) this.tasksFilter.select(idx);
     }
 
@@ -92,7 +92,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             id: "title",
             name: "Title",
             renderCell: renderExpandableTreeCell,
-            width: 400
+            width: 600
         },{
             id: "state",
             name: "State",
@@ -102,7 +102,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             id: "assignedTo",
             name: "Assigned To",
             renderCell: renderTreeCell,
-            width: 200
+            width: 140
         },{
             id: "area",
             name: "Area",
@@ -121,7 +121,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                     <DropdownFilterBarItem
                         filterItemKey="tasksFilter"
                         filter={this.filter}
-                        items={this.data.TaskFilterValaues}
+                        items={Data.TaskFilterValaues}
                         selection={this.tasksFilter}
                         placeholder="Tasks"
                         showPlaceholderAsLabel={false}

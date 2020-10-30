@@ -46,9 +46,26 @@ export class Data {
     Iterations: IListBoxItem<IIterationItem>[] = [];
 
     TaskFilter = "Current";
-    TaskFilterValaues = ["Current", "New+Current", "Done", "All"];
+    static TaskFilterValaues = ["Current", "New+Current", "Done", "All"];
 
-    WorkItemsProvider = new TreeItemProvider<IWorkItem>([]);
+    static LoadingItem: ITreeItem<IWorkItem> = {
+        childItems: [],
+        data: {
+            id: "loading",
+            title: { 
+                text: "loading...",
+                iconProps: Styles.LoadingIcon
+            },
+            state: {
+                text: ""
+            },
+            assignedTo: "",
+            area: "",
+            priority: 0
+        },
+        expanded: false
+    };
+    WorkItemsProvider = new TreeItemProvider<IWorkItem>([Data.LoadingItem]);
 
     async initialize(): Promise<void> {
         await SDK.ready();
@@ -184,7 +201,9 @@ export class Data {
             let childrenRels = await client.queryByWiql(childrenWiql, this.CurrentProjectID);
             let childrenItems = childrenRels.workItemRelations.filter(item => item.rel).map(item => item.target.id);
             
-            let items = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProjectID);
+            let items = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProjectID, 
+                undefined, undefined,
+                TfsWIT.WorkItemExpand.Relations);
 
             let result = items
                 .filter(it => it.fields["System.WorkItemType"]!="Task")
@@ -210,15 +229,23 @@ export class Data {
         let state = it.fields["System.State"] as string;
         let stateIcon = Styles.StatesMap[state] || Styles.StatesMap[""];
 
-        let isMine = state=="Active" || state=="Ready";
+        let isActive = state=="Active" || state=="Ready";
+        let isMy = assigned.uniqueName=="@me"; // Ale to trzeba poprawić
+
+        let pr = "";
+        for (const r of it.relations) {
+            if (r.rel=="ArtifactLink") {
+                if (r.url.indexOf("/PullRequestId/")>=0) pr = r.url; //'vstfs:///Git/PullRequestId/a86b1277-1813-42fb-81b6-023cf4f8f82b%2F50a99e50-41a3-4f2c-b11b-8a4b71b9f4cf%2F4538'
+            }
+        }
 
         return {
             // workItem: it,
             id: it.id.toString(),
             title: { 
-                text: it.fields["System.Title"] as string,
+                text: it.id + ": " + it.fields["System.Title"] as string,
                 iconProps: typeIcon,
-                textClassName: isMine ? "" : "currentlist-alien-text"
+                textClassName: "currentlist"+(isActive ? "-active" : "")+(isMy ? "-my" : "")+"-text"
             },
             state: {
                 text: state,
