@@ -27,6 +27,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
     private data = new Data();
     private filter: Filter;
     private iterationList = new DropdownSelection();
+    private tasksFilter = new DropdownSelection();
 
     constructor(props: {}) {
         super(props);
@@ -45,13 +46,27 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         this.setState({ version: this.state.version+1 });
 
         this.updateIterationIndex();
+        this.updateTaskFilter();
     }
 
     private async filterChanged() {
+        let changed = false;
+
         let idx = this.iterationList.value[0].beginIndex;
         if (this.data.Iterations[idx].id!=this.data.CurrentIterationPath) {
             this.data.CurrentIterationPath = this.data.Iterations[idx].id;
             this.updateIterationIndex();
+            changed = true;
+        }
+
+        let tf = this.tasksFilter.value[0].beginIndex;
+        if (this.data.TaskFilter!=this.data.TaskFilterValaues[tf]) {
+            this.data.TaskFilter = this.data.TaskFilterValaues[tf];
+            this.updateTaskFilter();
+            changed = true;
+        }
+
+        if (changed) {
             await this.data.reloadItems();
             this.setState({ version: this.state.version+1 });
         }
@@ -60,6 +75,11 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
     private updateIterationIndex(): void {
         let idx = this.data.Iterations.findIndex(it => it.id==this.data.CurrentIterationPath);
         if (idx>=0) this.iterationList.select(idx);
+    }
+
+    private updateTaskFilter(): void {
+        let idx = this.data.TaskFilterValaues.findIndex(it => it==this.data.TaskFilter);
+        if (idx>=0) this.tasksFilter.select(idx);
     }
 
     private async openWorkItemClick(id: string) {
@@ -97,6 +117,16 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                 <FilterBar filter={this.filter}>
 
                     <KeywordFilterBarItem filterItemKey="Placeholder" />
+
+                    <DropdownFilterBarItem
+                        filterItemKey="tasksFilter"
+                        filter={this.filter}
+                        items={this.data.TaskFilterValaues}
+                        selection={this.tasksFilter}
+                        placeholder="Tasks"
+                        showPlaceholderAsLabel={false}
+                        hideClearAction={true}
+                    />
 
                     <DropdownFilterBarItem
                         filterItemKey="iterationList"

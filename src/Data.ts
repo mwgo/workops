@@ -45,6 +45,9 @@ export class Data {
     WorkItems: ITreeItem<IWorkItem>[] = [];
     Iterations: IListBoxItem<IIterationItem>[] = [];
 
+    TaskFilter = "Current";
+    TaskFilterValaues = ["Current", "New+Current", "Done", "All"];
+
     WorkItemsProvider = new TreeItemProvider<IWorkItem>([]);
 
     async initialize(): Promise<void> {
@@ -134,19 +137,34 @@ export class Data {
                 iter = "'"+this.CurrentIterationPath+"'";
             else
                 iter = "@CurrentIteration";
+
+            let stateFilter = "'Ready', 'Active'";
+            if (this.TaskFilter=="New+Current")
+                stateFilter = "'New', 'Ready', 'Active'";
+            if (this.TaskFilter=="Done")
+                stateFilter = "'Resolved', 'Closed'";
+            if (this.TaskFilter=="All")
+                stateFilter = "'New', 'Ready', 'Active', 'Resolved', 'Closed', 'Removed'";
     
             let topWiql = {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
                             " AND [Target].[System.AssignedTo]=@me"+
                             " AND [Target].[Iteration Path]="+iter+
                             " AND [Target].[System.WorkItemType]='Task'"+
-                            " AND [Target].[System.State] IN ('Ready', 'Active')"
+                            " AND [Target].[System.State] IN ("+stateFilter+")"
             };
+
+            stateFilter = "'Ready', 'Active'";
+            if (this.TaskFilter=="Done")
+                stateFilter = "'Closed'";
+            if (this.TaskFilter=="All")
+                stateFilter = "'Ready', 'Active', 'Closed'";
+
             let topWiql2 = {
                 query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]=@me"+
                             " AND [Iteration Path]="+iter+
                             " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
-                            " AND [System.State] IN ('Ready', 'Active')"
+                            " AND [System.State] IN ("+stateFilter+")"
             };
 
             let top = await Promise.all([
