@@ -92,7 +92,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             id: "title",
             name: "Title",
             renderCell: renderExpandableTreeCell,
-            width: 800
+            width: 700
         },{
             id: "state",
             name: "State",
@@ -103,6 +103,11 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             name: "Assigned To",
             renderCell: renderTreeCell,
             width: 140
+        },{
+            id: "release",
+            name: "Version",
+            renderCell: renderTreeCell,
+            width: 100
         }
     ];
 

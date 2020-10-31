@@ -263,6 +263,21 @@ export class Data {
         }
     }
 
+    private getTreeChildren(item: TfsWIT.WorkItem, items: TfsWIT.WorkItem[], links: TfsWIT.WorkItemLink[]): ITreeItem<IWorkItem>[] | undefined {
+        if (item.fields["System.WorkItemType"]=="Task") return undefined;
+
+        let children = links
+            .filter(l => l.source && l.target && l.source.id==item.id)
+            .map(l => items.first(it => it.id==l.target.id))
+            .map(it => ({
+                childItems: it ? this.getTreeChildren(it, items, links) : [],
+                data: this.getTreeItem(it),
+                expanded: false
+            }));
+
+        return children;
+    }
+
     private getTreeItem(it: TfsWIT.WorkItem): IWorkItem {
         let assigned = it.fields["System.AssignedTo"];
 
@@ -271,6 +286,9 @@ export class Data {
 
         let state = it.fields["System.State"] as string;
         let stateIcon = Styles.StatesMap[state] || Styles.StatesMap[""];
+
+        let release = it.fields["Custom.Release"] as string;
+        if (!release) release = it.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
 
         let isActive = state=="Active" || state=="Ready";
         let isMy = assigned.uniqueName=="@me"; // Ale to trzeba poprawić
@@ -296,23 +314,9 @@ export class Data {
             },
             assignedTo: (assigned ? assigned.displayName : "") as string,
             area: it.fields["System.AreaPath"] as string,
-            priority: it.fields["Microsoft.VSTS.Common.Priority"] as number
+            priority: it.fields["Microsoft.VSTS.Common.Priority"] as number,
+            release: release
         };
-    }
-
-    private getTreeChildren(item: TfsWIT.WorkItem, items: TfsWIT.WorkItem[], links: TfsWIT.WorkItemLink[]): ITreeItem<IWorkItem>[] | undefined {
-        if (item.fields["System.WorkItemType"]=="Task") return undefined;
-
-        let children = links
-            .filter(l => l.source && l.target && l.source.id==item.id)
-            .map(l => items.first(it => it.id==l.target.id))
-            .map(it => ({
-                childItems: it ? this.getTreeChildren(it, items, links) : [],
-                data: this.getTreeItem(it),
-                expanded: false
-            }));
-
-        return children;
     }
 
 }
