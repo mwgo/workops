@@ -40,8 +40,8 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
     public render(): JSX.Element {
         return (
             <Page className="sample-hub flex-grow">
-                <Header title="Current Work-Items"
-                    commandBarItems={this.getCommandBarItems()}
+                <Header title="Current Work"
+                    // commandBarItems={this.getCommandBarItems()}
                     titleSize={TitleSize.Medium} />
                 {/* <TabBar
                     onSelectedTabChanged={this.onSelectedTabChanged}

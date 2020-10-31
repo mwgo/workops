@@ -4,6 +4,10 @@
     font-size: $fontSizeM;
 }
 
+.currentlist-area-text {
+    font-weight: bolder;
+}
+
 .currentlist-text {
     font-weight: inherit;
 }
@@ -15,6 +19,7 @@
 .currentlist-my-text {
     font-weight: bolder;
 }
+
 .currentlist-active-my-text {
     color: rgb(168, 167, 167);
     font-weight: bolder;

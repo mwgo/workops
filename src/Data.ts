@@ -115,8 +115,11 @@ export class Data {
             }
         }
 
-        let iter = iterations.first(i => Data.isCurrentIteration(i));
-        this.CurrentIterationPath = iter ? iter.path : "";
+        let iterIdx = iterations.findIndex(i => Data.isCurrentIteration(i));
+        if (iterIdx<0) iterIdx = iterations.findIndex(i => Data.isCurrentIteration2(i));
+
+        if (iterIdx<0 && iterations.length>0) iterIdx = iterations.length-1;
+        this.CurrentIterationPath = iterIdx<0 ? "" : iterations[iterIdx].path;
 
         return iterations.map(it => { 
             let sufix = "";
@@ -141,6 +144,18 @@ export class Data {
         finish.setDate(finish.getDate()+1);
 
         return start.getTime()<=dt && dt<finish.getTime();
+    }
+
+    private static isCurrentIteration2(iter: TfsWork.TeamSettingsIteration): boolean {
+        let dt = Date.now();
+        
+        let start = iter.attributes.startDate;
+        if (!start || dt>start.getTime()) return false;
+
+        let finish = iter.attributes.finishDate;
+        if (finish && dt>finish.getTime()) return false;
+
+        return true;
     }
 
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
@@ -205,18 +220,46 @@ export class Data {
                 undefined, undefined,
                 TfsWIT.WorkItemExpand.Relations);
 
-            let result = items
-                .filter(it => it.fields["System.WorkItemType"]!="Task")
-                .map(it => ({
-                    childItems: this.getTreeChildren(it, items, childrenRels.workItemRelations),
-                    data: this.getTreeItem(it),
-                    expanded: false
-                }));
+            let stories = items.filter(it => it.fields["System.WorkItemType"]!="Task")
+
+            let areas = stories
+                .map(it => it.fields["System.AreaPath"] as string)
+                .sort();
+            areas = areas.filter((item, idx) => areas.indexOf(item)==idx); 
+
+            let result = areas.map(a => this.getAreaItem(a, stories, items, childrenRels));
 
             return result;
         }
         catch (e) {
             return [];
+        }
+    }
+
+    private getAreaItem(path: string, items: TfsWIT.WorkItem[], all: TfsWIT.WorkItem[], childrenRels: TfsWIT.WorkItemQueryResult): ITreeItem<IWorkItem> {
+        return {
+            childItems: items
+                .filter(it => it.fields["System.AreaPath"]==path)
+                .map(it => ({
+                    childItems: this.getTreeChildren(it, all, childrenRels.workItemRelations),
+                    data: this.getTreeItem(it),
+                    expanded: false
+                })),
+            data: {
+                id: "area"+path,
+                title: { 
+                    text: path,
+                    iconProps: Styles.AreaIcon,
+                    textClassName: "currentlist-area-text"
+                },
+                state: {
+                    text: ""
+                },
+                assignedTo: "",
+                area: "",
+                priority: 0
+            },
+            expanded: true
         }
     }
 

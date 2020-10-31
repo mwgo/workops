@@ -59,7 +59,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             changed = true;
         }
 
-        let tf = this.tasksFilter.value[0].beginIndex;
+        let tf = this.tasksFilter.value.length==0 ? 0 : this.tasksFilter.value[0].beginIndex;
         if (this.data.TaskFilter!=Data.TaskFilterValaues[tf]) {
             this.data.TaskFilter = Data.TaskFilterValaues[tf];
             this.updateTaskFilter();
@@ -92,7 +92,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             id: "title",
             name: "Title",
             renderCell: renderExpandableTreeCell,
-            width: 600
+            width: 800
         },{
             id: "state",
             name: "State",
@@ -103,18 +103,15 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
             name: "Assigned To",
             renderCell: renderTreeCell,
             width: 140
-        },{
-            id: "area",
-            name: "Area",
-            renderCell: renderTreeCell,
-            width: 200
         }
     ];
 
     public render(): JSX.Element {
         return (
             <div className="page-content page-content-top flex-column rhythm-vertical-16">
-                <FilterBar filter={this.filter}>
+                <FilterBar 
+                    filter={this.filter} 
+                    hideClearAction={true}>
 
                     <KeywordFilterBarItem filterItemKey="Placeholder" />
 
