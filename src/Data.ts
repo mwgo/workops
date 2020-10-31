@@ -18,6 +18,7 @@ import { IListBoxItem } from "azure-devops-ui/ListBox";
 import { ISimpleTableCell } from "azure-devops-ui/Table";
 import { ISimpleListCell } from "azure-devops-ui/List";
 import { Styles } from "./Styles";
+import React = require("react");
 
 
 export interface IIterationItem {
@@ -300,11 +301,16 @@ export class Data {
             }
         }
 
+        // var rrr = React.createElement("div", null,
+        //     React.createElement("div", null, it.id + ": " + it.fields["System.Title"] as string),
+        //     React.createElement("div", null, "2222222"));
+
         return {
             // workItem: it,
             id: it.id.toString(),
             title: { 
                 text: it.id + ": " + it.fields["System.Title"] as string,
+                // textNode: rrr,
                 iconProps: typeIcon,
                 textClassName: "currentlist"+(isActive ? "-active" : "")+(isMy ? "-my" : "")+"-text"
             },

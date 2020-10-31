@@ -17,6 +17,7 @@ import {
     IWorkItem,
     Data,
 } from "../Data"
+import ReactDOM = require("react-dom");
 
 interface ITodoListTabState {
     version: number;
@@ -148,6 +149,10 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                         itemProvider={this.data.WorkItemsProvider}
                         columns={this.columns}
                         onToggle={(event, treeItem) => {
+
+                            // let a:React.ReactNode = treeItem.underlyingItem.data.title.textNode;
+                            // a.props.children[1].props.children = "3333";
+
                             this.data.WorkItemsProvider.toggle(treeItem.underlyingItem);
                         }}
                         onSelect={(event, item) => {
