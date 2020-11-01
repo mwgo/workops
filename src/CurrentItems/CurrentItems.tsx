@@ -5,8 +5,6 @@ import * as React from "react";
 import * as SDK from "azure-devops-extension-sdk";
 import { CommonServiceIds, IHostPageLayoutService } from "azure-devops-extension-api";
 
-import { Tab, TabBar, TabSize } from "azure-devops-ui/Tabs";
-
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { IHeaderCommandBarItem } from "azure-devops-ui/HeaderCommandBar";
 import { Page } from "azure-devops-ui/Page";

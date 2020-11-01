@@ -19,6 +19,7 @@ import { ISimpleTableCell } from "azure-devops-ui/Table";
 import { ISimpleListCell } from "azure-devops-ui/List";
 import { Styles } from "./Styles";
 import React = require("react");
+import { LinkItem } from "./LinkItem";
 
 
 export interface IIterationItem {
@@ -159,6 +160,9 @@ export class Data {
         return true;
     }
 
+    AllItems: TfsWIT.WorkItem[] = [];
+    AllLinks: TfsWIT.WorkItemLink[] = [];
+
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
         if (!this.CurrentProject) return [];
         
@@ -215,20 +219,21 @@ export class Data {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
             };
             let childrenRels = await client.queryByWiql(childrenWiql, this.CurrentProjectID);
-            let childrenItems = childrenRels.workItemRelations.filter(item => item.rel).map(item => item.target.id);
+            this.AllLinks = childrenRels.workItemRelations;
+            let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
             
-            let items = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProjectID, 
+            this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProjectID, 
                 undefined, undefined,
                 TfsWIT.WorkItemExpand.Relations);
 
-            let stories = items.filter(it => it.fields["System.WorkItemType"]!="Task")
+            let stories = this.AllItems.filter(it => it.fields["System.WorkItemType"]!="Task")
 
             let areas = stories
                 .map(it => it.fields["System.AreaPath"] as string)
                 .sort();
             areas = areas.filter((item, idx) => areas.indexOf(item)==idx); 
 
-            let result = areas.map(a => this.getAreaItem(a, stories, items, childrenRels));
+            let result = areas.map(a => this.getAreaItem(a, stories));
 
             return result;
         }
@@ -237,12 +242,12 @@ export class Data {
         }
     }
 
-    private getAreaItem(path: string, items: TfsWIT.WorkItem[], all: TfsWIT.WorkItem[], childrenRels: TfsWIT.WorkItemQueryResult): ITreeItem<IWorkItem> {
+    private getAreaItem(path: string, items: TfsWIT.WorkItem[]): ITreeItem<IWorkItem> {
         return {
             childItems: items
                 .filter(it => it.fields["System.AreaPath"]==path)
                 .map(it => ({
-                    childItems: this.getTreeChildren(it, all, childrenRels.workItemRelations),
+                    childItems: this.getTreeChildren(it),
                     data: this.getTreeItem(it),
                     expanded: false
                 })),
@@ -264,19 +269,45 @@ export class Data {
         }
     }
 
-    private getTreeChildren(item: TfsWIT.WorkItem, items: TfsWIT.WorkItem[], links: TfsWIT.WorkItemLink[]): ITreeItem<IWorkItem>[] | undefined {
+    private getChildrenItems(item: TfsWIT.WorkItem): TfsWIT.WorkItem[] {
+        return this.AllLinks
+            .filter(l => l.source && l.target && l.source.id==item.id)
+            .map(l => this.AllItems.first(it => it.id==l.target.id));
+    }
+            
+    private getRecursiveItems(item: TfsWIT.WorkItem): TfsWIT.WorkItem[] {
+        let t = [item];
+
+        let scan = (it: TfsWIT.WorkItem) => {
+            let r = this.getChildrenItems(it);
+            t = t.concat(r);
+            r.forEach(scan);
+        }
+        scan(item);
+
+        return t;
+    }
+            
+    private getTreeChildren(item: TfsWIT.WorkItem): ITreeItem<IWorkItem>[] | undefined {
         if (item.fields["System.WorkItemType"]=="Task") return undefined;
 
-        let children = links
-            .filter(l => l.source && l.target && l.source.id==item.id)
-            .map(l => items.first(it => it.id==l.target.id))
+        let children = this.getChildrenItems(item)
             .map(it => ({
-                childItems: it ? this.getTreeChildren(it, items, links) : [],
+                childItems: it ? this.getTreeChildren(it) : [],
                 data: this.getTreeItem(it),
                 expanded: false
             }));
 
         return children;
+    }
+
+    private getRelations(it: TfsWIT.WorkItem): { type: string, link: string }[] {
+        return it.relations
+            .filter(r => r.rel=="ArtifactLink")
+            .map(r => ({ 
+                type: r.url.indexOf("/PullRequestId/")>=0 ? "pr" : r.url.indexOf("/Commit/")>=0 ? "branch" : "",
+                link: r.url
+             }));
     }
 
     private getTreeItem(it: TfsWIT.WorkItem): IWorkItem {
@@ -294,23 +325,34 @@ export class Data {
         let isActive = state=="Active" || state=="Ready";
         let isMy = assigned.uniqueName=="@me"; // Ale to trzeba poprawić
 
-        let pr = "";
-        for (const r of it.relations) {
-            if (r.rel=="ArtifactLink") {
-                if (r.url.indexOf("/PullRequestId/")>=0) pr = r.url; //'vstfs:///Git/PullRequestId/a86b1277-1813-42fb-81b6-023cf4f8f82b%2F50a99e50-41a3-4f2c-b11b-8a4b71b9f4cf%2F4538'
-            }
-        }
+        let n = 0;
+        let rels : React.ReactNode[] = this
+            .getRelations(it)
+            .map(r => React.createElement(LinkItem, { 
+                Data: this, 
+                Link: r.link, 
+                ID: it.id, 
+                Icon: r.type=="pr" ? "BranchPullRequest" : "BranchCommit", 
+                key: it.id + r.type + (n++)
+            }));
 
-        // var rrr = React.createElement("div", null,
-        //     React.createElement("div", null, it.id + ": " + it.fields["System.Title"] as string),
-        //     React.createElement("div", null, "2222222"));
+        let textNode: React.ReactNode = null;
+        if (rels.length>0) {
+            for (let i = rels.length; --i>0; )
+                rels.splice(i, 0, " ");
+            textNode = React.createElement("div", null,
+                it.id + ": " + it.fields["System.Title"] as string,
+                React.createElement("div", null,
+                    React.createElement("small", null, rels
+            )));
+        }
 
         return {
             // workItem: it,
             id: it.id.toString(),
             title: { 
                 text: it.id + ": " + it.fields["System.Title"] as string,
-                // textNode: rrr,
+                textNode: textNode,
                 iconProps: typeIcon,
                 textClassName: "currentlist"+(isActive ? "-active" : "")+(isMy ? "-my" : "")+"-text"
             },
@@ -323,6 +365,43 @@ export class Data {
             priority: it.fields["Microsoft.VSTS.Common.Priority"] as number,
             release: release
         };
+    }
+
+    //
+    // LINKS
+    //
+
+    LinkItems: LinkItem[] = [];
+    LinksInfo: { [link: string]: string } = {};
+
+    toggle(item: ITreeItem<IWorkItem>): void {
+        let id = parseInt(item.data.id);
+        let witem = this.AllItems.find(it => it.id==id);
+        if (!witem) return;
+
+        let items = this.getRecursiveItems(witem);
+        for (const i of items) {
+            for (const l of this.getRelations(i)) {
+                if (this.LinksInfo[l.link]===undefined)
+                    this.LinksInfo[l.link] = "";
+            }
+        }
+        setTimeout(() => {
+            for (const i of items) {
+                for (const l of this.getRelations(i)) {
+                    if (this.LinksInfo[l.link]=="")
+                        this.LinksInfo[l.link] = l.type;
+                }
+            }
+
+            let links = this.LinkItems.filter(l => items.some(i => i.id==l.props.ID));
+            links.forEach(it => it.update());
+        }, 2000);
+
+        let links = this.LinkItems.filter(l => items.some(i => i.id==l.props.ID));
+        links.forEach(it => it.update());
+
+        this.WorkItemsProvider.toggle(item);
     }
 
 }

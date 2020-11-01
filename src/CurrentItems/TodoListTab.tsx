@@ -148,13 +148,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                     <Tree<IWorkItem>
                         itemProvider={this.data.WorkItemsProvider}
                         columns={this.columns}
-                        onToggle={(event, treeItem) => {
-
-                            // let a:React.ReactNode = treeItem.underlyingItem.data.title.textNode;
-                            // a.props.children[1].props.children = "3333";
-
-                            this.data.WorkItemsProvider.toggle(treeItem.underlyingItem);
-                        }}
+                        onToggle={(event, item) => this.data.toggle(item.underlyingItem)}
                         onSelect={(event, item) => {
                             this.openWorkItemClick(item.data.underlyingItem.data.id);
                             event.preventDefault();
