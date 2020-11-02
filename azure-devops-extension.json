@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "current-works-extension",
     "publisher": "MarcinWojas",
-    "version": "0.0.74",
+    "version": "0.0.75",
     "name": "Current work items",
     "description": "List of currents Ready/Active and my items in current sprint",
     "scopes": [
