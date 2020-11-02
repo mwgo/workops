@@ -270,9 +270,10 @@ export class Data {
     }
 
     private getChildrenItems(item: TfsWIT.WorkItem): TfsWIT.WorkItem[] {
-        return this.AllLinks
+        let result = this.AllLinks
             .filter(l => l.source && l.target && l.source.id==item.id)
             .map(l => this.AllItems.first(it => it.id==l.target.id));
+        return result;
     }
             
     private getRecursiveItems(item: TfsWIT.WorkItem): TfsWIT.WorkItem[] {
@@ -323,7 +324,7 @@ export class Data {
         if (!release) release = it.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
 
         let isActive = state=="Active" || state=="Ready";
-        let isMy = assigned.uniqueName=="@me"; // Ale to trzeba poprawić
+        let isMy = assigned && assigned.uniqueName=="marcin.wojas@soneta.pl"; // Ale to trzeba poprawić
 
         let n = 0;
         let rels : React.ReactNode[] = this
@@ -347,7 +348,7 @@ export class Data {
             )));
         }
 
-        return {
+        let result = {
             // workItem: it,
             id: it.id.toString(),
             title: { 
@@ -365,6 +366,8 @@ export class Data {
             priority: it.fields["Microsoft.VSTS.Common.Priority"] as number,
             release: release
         };
+
+        return result;
     }
 
     //
@@ -398,8 +401,8 @@ export class Data {
             links.forEach(it => it.update());
         }, 2000);
 
-        let links = this.LinkItems.filter(l => items.some(i => i.id==l.props.ID));
-        links.forEach(it => it.update());
+        // let links = this.LinkItems.filter(l => items.some(i => i.id==l.props.ID));
+        // links.forEach(it => it.update());
 
         this.WorkItemsProvider.toggle(item);
     }
