@@ -8,19 +8,22 @@
     font-weight: bolder;
 }
 
-.currentlist-text {
-    color: rgb(168, 167, 167);
-}
-
 .currentlist-active-text {
     font-weight: inherit;
 }
 
-.currentlist-my-text {
-    color: rgb(168, 167, 167);
+.currentlist-my-id {
     font-weight: bolder;
 }
 
-.currentlist-active-my-text {
-    font-weight: bolder;
+.linkitem_text {
+    padding: 0px 3px;
+}
+
+.linkitem_text>span {
+    font-size: x-small;
+}
+
+.linkitem_text>span.fabric-icon.medium {
+    font-size: x-small;
 }

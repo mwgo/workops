@@ -2,12 +2,13 @@
     "manifestVersion": 1,
     "id": "current-works-extension",
     "publisher": "MarcinWojas",
-    "version": "0.0.75",
+    "version": "0.0.78",
     "name": "Current work items",
     "description": "List of currents Ready/Active and my items in current sprint",
     "scopes": [
         "vso.work",
-        "vso.work_full"
+        "vso.work_full",
+        "vso.code"
     ],
     "public": false,
     "baseUri": "http://localhost:44300/",

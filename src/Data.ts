@@ -5,12 +5,17 @@ import {
     getClient,
     CommonServiceIds, 
     IProjectPageService,
-    IProjectInfo
+    IProjectInfo,
+    TeamFoundationHostType
 } from "azure-devops-extension-api";
 import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 import * as TfsClient from "azure-devops-extension-api/Work/WorkClient";
 import * as TfsWork from "azure-devops-extension-api/Work";
+import * as TfsGit from "azure-devops-extension-api/Git";
+import * as TfsGitServices from "azure-devops-extension-api/Git/GitServices";
+import * as TfsGitClient from "azure-devops-extension-api/Git/GitClient";
+import * as TfsGitGit from "azure-devops-extension-api/Git/Git";
 
 import { ITreeItem, ITreeItemEx, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
 import { IListBoxItem } from "azure-devops-ui/ListBox";
@@ -41,7 +46,7 @@ export interface IWorkItem extends ISimpleTableCell {
 export class Data {
 
     CurrentProject?: IProjectInfo;
-    CurrentProjectID = "";
+    CurrentUser?: SDK.IUserContext;
     CurrentIterationPath = "";
 
     WorkItems: ITreeItem<IWorkItem>[] = [];
@@ -80,18 +85,15 @@ export class Data {
         this.WorkItemsProvider = new TreeItemProvider(this.WorkItems);
     }
 
+    private async loadProject(): Promise<void> {
+        const navService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
+        this.CurrentProject = await navService.getProject();
+        this.CurrentUser = SDK.getUser();
+    }
+
     async reloadItems() {
         this.WorkItems = await this.loadItems();
         this.WorkItemsProvider = new TreeItemProvider(this.WorkItems);
-    }
-
-    private async loadProject(): Promise<void> {
-        const navService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
-        let project = await navService.getProject();
-        if (project) {
-            this.CurrentProject = project;
-            this.CurrentProjectID = project.id;
-        }
     }
 
     private async loadIterations(): Promise<IListBoxItem<IIterationItem>[]> {
@@ -100,12 +102,15 @@ export class Data {
         let coreClient = getClient(TfsCore.CoreRestClient);
         let workClient = getClient(TfsClient.WorkRestClient);
 
-        let projectId = this.CurrentProjectID;
-        let teams = await coreClient.getTeams(this.CurrentProjectID, true, 50);
+        let projectId = this.CurrentProject.id;
+
+        let teams = await coreClient.getTeams(this.CurrentProject.id, true, 50);
+
         let titerations = await Promise.all(teams.map(team => {
             let teamContext: TfsCore.TeamContext = { projectId: projectId, teamId: team.id, project: "", team: "" };
             return workClient.getTeamIterations(teamContext);
         }));
+
 
         let time = new Date().getTime() - 40*24*60*60*1000;
         let iterations: TfsWork.TeamSettingsIteration[] = [];
@@ -205,8 +210,8 @@ export class Data {
             };
 
             let top = await Promise.all([
-                client.queryByWiql(topWiql, this.CurrentProjectID),
-                client.queryByWiql(topWiql2, this.CurrentProjectID)
+                client.queryByWiql(topWiql, this.CurrentProject.id),
+                client.queryByWiql(topWiql2, this.CurrentProject.id)
             ]);
 
             if (!top[0] || !top[1]) return [];
@@ -218,11 +223,11 @@ export class Data {
             let childrenWiql = {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
             };
-            let childrenRels = await client.queryByWiql(childrenWiql, this.CurrentProjectID);
+            let childrenRels = await client.queryByWiql(childrenWiql, this.CurrentProject.id);
             this.AllLinks = childrenRels.workItemRelations;
             let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
             
-            this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProjectID, 
+            this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProject.id, 
                 undefined, undefined,
                 TfsWIT.WorkItemExpand.Relations);
 
@@ -303,12 +308,22 @@ export class Data {
     }
 
     private getRelations(it: TfsWIT.WorkItem): { type: string, link: string }[] {
-        return it.relations
-            .filter(r => r.rel=="ArtifactLink")
-            .map(r => ({ 
-                type: r.url.indexOf("/PullRequestId/")>=0 ? "pr" : r.url.indexOf("/Commit/")>=0 ? "branch" : "",
+        let t: { type: string, link: string }[] = [];
+        for (let r of it.relations.filter(r => r.rel=="ArtifactLink")) {
+            t.push({ 
+                type: r.url.indexOf("/PullRequestId/")>=0 ? "pr" 
+                    : r.url.indexOf("/Commit/")>=0 ? "commit" 
+                    : r.url.indexOf("/Ref/")>=0 ? "branch" 
+                    : "",
                 link: r.url
-             }));
+            });
+            if (r.url.indexOf("/PullRequestId/")>=0) 
+                t.push({ 
+                    type: "prbranch",
+                    link: r.url
+                });
+        }
+        return t;
     }
 
     private getTreeItem(it: TfsWIT.WorkItem): IWorkItem {
@@ -324,27 +339,38 @@ export class Data {
         if (!release) release = it.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
 
         let isActive = state=="Active" || state=="Ready";
-        let isMy = assigned && assigned.uniqueName=="marcin.wojas@soneta.pl"; // Ale to trzeba poprawić
+        let isMy = assigned && this.CurrentUser && assigned.uniqueName==this.CurrentUser.name;
 
         let n = 0;
         let rels : React.ReactNode[] = this
             .getRelations(it)
             .map(r => React.createElement(LinkItem, { 
                 Data: this, 
-                Link: r.link, 
+                Link: r.type + r.link, 
                 ID: it.id, 
-                Icon: r.type=="pr" ? "BranchPullRequest" : "BranchCommit", 
+                Icon: Styles.LinksIcon[r.type], 
                 key: it.id + r.type + (n++)
             }));
 
-        let textNode: React.ReactNode = null;
+        let textNode: React.ReactNode = it.fields["System.Title"] as string;
+        if (isMy)
+            textNode = React.createElement("span", null,
+                React.createElement("span", { className: "currentlist-my-id" },
+                    it.id+": "
+                ),
+                textNode
+            );
+        else
+            textNode = it.id + ": " + textNode;
+
         if (rels.length>0) {
             for (let i = rels.length; --i>0; )
                 rels.splice(i, 0, " ");
             textNode = React.createElement("div", null,
-                it.id + ": " + it.fields["System.Title"] as string,
+                textNode,
                 React.createElement("div", null,
-                    React.createElement("small", null, rels
+                    React.createElement("small", null, 
+                        rels
             )));
         }
 
@@ -355,7 +381,7 @@ export class Data {
                 text: it.id + ": " + it.fields["System.Title"] as string,
                 textNode: textNode,
                 iconProps: typeIcon,
-                textClassName: "currentlist"+(isActive ? "-active" : "")+(isMy ? "-my" : "")+"-text"
+                textClassName: isActive ? "currentlist-active-text" : ""
             },
             state: {
                 text: state,
@@ -375,38 +401,111 @@ export class Data {
     //
 
     LinkItems: LinkItem[] = [];
-    LinksInfo: { [link: string]: string } = {};
+    LinksInfo: { [link: string]: { name: string, title: string, url: string } } = {};
 
     toggle(item: ITreeItem<IWorkItem>): void {
         let id = parseInt(item.data.id);
         let witem = this.AllItems.find(it => it.id==id);
         if (!witem) return;
 
-        let items = this.getRecursiveItems(witem);
-        for (const i of items) {
-            for (const l of this.getRelations(i)) {
-                if (this.LinksInfo[l.link]===undefined)
-                    this.LinksInfo[l.link] = "";
-            }
-        }
-        setTimeout(() => {
-            for (const i of items) {
-                for (const l of this.getRelations(i)) {
-                    if (this.LinksInfo[l.link]=="")
-                        this.LinksInfo[l.link] = l.type;
-                }
-            }
-
-            let links = this.LinkItems.filter(l => items.some(i => i.id==l.props.ID));
-            links.forEach(it => it.update());
-        }, 2000);
-
-        // let links = this.LinkItems.filter(l => items.some(i => i.id==l.props.ID));
-        // links.forEach(it => it.update());
+        this.retrieveLinks(this.getRecursiveItems(witem));
 
         this.WorkItemsProvider.toggle(item);
     }
 
+    private async retrieveLinks(items: TfsWIT.WorkItem[]) {
+        const tfs = getClient(TfsGit.GitRestClient);
+
+        let changed = false;
+        for (const i of items) {
+            for (const l of this.getRelations(i)) {
+                if (!this.LinksInfo[l.link]) {
+                    await this.retrieveLink(tfs, l);
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+            let links = this.LinkItems//.filter(l => items.some(i => i.id==l.props.ID));
+            links.forEach(it => it.update());
+        }
+    }
+
+    private async retrieveLink(tfs: TfsGit.GitRestClient, l: { type: string, link: string }) {
+        if (l.type=="pr") {
+            let s = l.link.substring(l.link.lastIndexOf("/")+1);
+            let args = s.split("%2F");
+
+            // vstfs://vstfs:///Git/PullRequestId/[project id]%2F[respository id]%2F[pull request id]
+
+            let pr = await tfs.getPullRequestById(parseInt(args[2]), args[0]);
+
+            let url = pr.url;
+            url = url.replace("/_apis/git/repositories/", "/_git/");
+            url = url.replace("/pullRequests/", "/pullrequest/");
+
+            this.LinksInfo[l.type+l.link] = {
+                name: "!"+pr.pullRequestId + (pr.status==3 ? " [C]" : pr.status==2 ? " [D]" : ""),
+                title: pr.title + (pr.status==3 ? " [Completed]" : pr.status==2 ? " [Draft]" : ""),
+                url: url
+            };
+
+            try {
+                let branch = Data.prepareRef(pr.sourceRefName);
+
+                let b = await tfs.getBranch(args[1], branch);
+
+                let i = url.indexOf("/pullrequest/");
+                url = url.substring(0, i) + "?version=GB" + branch.replace("/", "%2f");
+
+
+                this.LinksInfo[l.type+"branch"+l.link] = {
+                    name: branch,
+                    title: branch + " -> " + Data.prepareRef(pr.targetRefName),
+                    url: url
+                };
+            }
+            catch {
+            }
+        }
+
+        if (l.type=="branch") {
+            let s = l.link.substring(l.link.lastIndexOf("/")+1);
+            let args = s.split("%2F");
+            let projectID = args.shift() || "";
+            let repositoryID = args.shift() || "";
+            let branchName = args.join("/").substring(2);
+
+            // vstfs:///Git/Ref/[project id]%2F[respository id]%2FGB[branch]
+
+            try {
+                let branch = await tfs.getBranch(repositoryID, branchName, projectID);
+
+                let url = branch.commit.url;
+                url = url.replace("/_apis/git/repositories/", "/_git/");
+                let i = url.indexOf("/commits/");
+                url = url.substring(0, i) + "?version="+args.join("%2F");
+
+                this.LinksInfo[l.type+l.link] = {
+                    name: branchName,
+                    title: branchName + " Commit: " + branch.commit.author.name + " : " + branch.commit.comment,
+                    url: url
+                };
+            }
+            catch {
+                this.LinksInfo[l.type+l.link] = {
+                    name: branchName + " [R]",
+                    title: branchName + " [Removed]",
+                    url: ""
+                };
+            }
+        }
+    }
+
+    private static prepareRef(s: string): string {
+        return s.startsWith("refs/heads/") ? s.substring(11) : s;
+    }
 }
 
 ToolsSetup();

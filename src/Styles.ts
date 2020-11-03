@@ -10,6 +10,13 @@ export class Styles {
 
     static AreaIcon: IIconProps = { iconName: "StatusCircleInner", style: { color: "#000000"} };
 
+    static LinksIcon: { [lisk: string]: string } = {
+        "pr": "BranchPullRequest",
+        "prbranch": "BranchFork2",
+        "commit" : "BranchCommit",
+        "branch" : "BranchFork2"
+    };
+
     static TypesMap: IIconPropsMap = {
         "": { iconName: "SkypeCircleCheck" },
         "Feature": { iconName: "Trophy2Solid", style: { color: "#773B93"} },
