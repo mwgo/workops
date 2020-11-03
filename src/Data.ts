@@ -5,19 +5,15 @@ import {
     getClient,
     CommonServiceIds, 
     IProjectPageService,
-    IProjectInfo,
-    TeamFoundationHostType
+    IProjectInfo
 } from "azure-devops-extension-api";
 import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 import * as TfsClient from "azure-devops-extension-api/Work/WorkClient";
 import * as TfsWork from "azure-devops-extension-api/Work";
 import * as TfsGit from "azure-devops-extension-api/Git";
-import * as TfsGitServices from "azure-devops-extension-api/Git/GitServices";
-import * as TfsGitClient from "azure-devops-extension-api/Git/GitClient";
-import * as TfsGitGit from "azure-devops-extension-api/Git/Git";
 
-import { ITreeItem, ITreeItemEx, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
+import { ITreeItem, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
 import { IListBoxItem } from "azure-devops-ui/ListBox";
 
 import { ISimpleTableCell } from "azure-devops-ui/Table";
@@ -53,7 +49,9 @@ export class Data {
     Iterations: IListBoxItem<IIterationItem>[] = [];
 
     TaskFilter = "Current";
-    static TaskFilterValaues = ["Current", "New+Current", "Done", "All"];
+    static TaskFilterValues = ["Current", "New+Current", "Done", "All"];
+    UserFilter = "@me";
+    UserFilterValues = ["@me"];
 
     static LoadingItem: ITreeItem<IWorkItem> = {
         childItems: [],
@@ -174,12 +172,13 @@ export class Data {
         try {
             const client = getClient(TfsWIT.WorkItemTrackingRestClient);
 
-            let iter: string;
+            let iter = "@CurrentIteration";
             if (this.CurrentIterationPath)
                 iter = "'"+this.CurrentIterationPath+"'";
-            else
-                iter = "@CurrentIteration";
-
+            let user = this.UserFilter;
+            if (user.substring(0, 1)!="@")
+                user = "'"+user+"'";
+    
             let stateFilter = "'Ready', 'Active'";
             if (this.TaskFilter=="New+Current")
                 stateFilter = "'New', 'Ready', 'Active'";
@@ -190,7 +189,7 @@ export class Data {
     
             let topWiql = {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
-                            " AND [Target].[System.AssignedTo]=@me"+
+                            " AND [Target].[System.AssignedTo]="+user+
                             " AND [Target].[Iteration Path]="+iter+
                             " AND [Target].[System.WorkItemType]='Task'"+
                             " AND [Target].[System.State] IN ("+stateFilter+")"
@@ -203,7 +202,7 @@ export class Data {
                 stateFilter = "'Ready', 'Active', 'Closed'";
 
             let topWiql2 = {
-                query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]=@me"+
+                query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]="+user+
                             " AND [Iteration Path]="+iter+
                             " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
                             " AND [System.State] IN ("+stateFilter+")"
@@ -231,6 +230,8 @@ export class Data {
                 undefined, undefined,
                 TfsWIT.WorkItemExpand.Relations);
 
+            this.updateUsers();
+                
             let stories = this.AllItems.filter(it => it.fields["System.WorkItemType"]!="Task")
 
             let areas = stories
@@ -245,6 +246,21 @@ export class Data {
         catch (e) {
             return [];
         }
+    }
+
+    private updateUsers(): void {
+        this.UserFilterValues = [];
+        for (const wi of this.AllItems) {
+            let s0 = wi.fields["System.AssignedTo"].uniqueName as string;
+            let s1 = wi.fields["System.ChangedBy"].uniqueName as string;
+            let s2 = wi.fields["System.CreatedBy"].uniqueName as string;
+
+            if (this.UserFilterValues.indexOf(s0)<0) this.UserFilterValues.push(s0);
+            if (this.UserFilterValues.indexOf(s1)<0) this.UserFilterValues.push(s1);
+            if (this.UserFilterValues.indexOf(s2)<0) this.UserFilterValues.push(s2);
+        }
+        this.UserFilterValues.sort();
+        this.UserFilterValues.splice(0, 0, "@me");
     }
 
     private getAreaItem(path: string, items: TfsWIT.WorkItem[]): ITreeItem<IWorkItem> {

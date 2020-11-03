@@ -16,8 +16,7 @@ import { DropdownSelection } from "azure-devops-ui/Utilities/DropdownSelection";
 import {
     IWorkItem,
     Data,
-} from "../Data"
-import ReactDOM = require("react-dom");
+} from "../Data";
 
 interface ITodoListTabState {
     version: number;
@@ -29,6 +28,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
     private filter: Filter;
     private iterationList = new DropdownSelection();
     private tasksFilter = new DropdownSelection();
+    private userFilter = new DropdownSelection();
 
     constructor(props: {}) {
         super(props);
@@ -48,6 +48,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
         this.updateIterationIndex();
         this.updateTaskFilter();
+        this.updateUserFilter();
     }
 
     private async filterChanged() {
@@ -61,9 +62,16 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
         }
 
         let tf = this.tasksFilter.value.length==0 ? 0 : this.tasksFilter.value[0].beginIndex;
-        if (this.data.TaskFilter!=Data.TaskFilterValaues[tf]) {
-            this.data.TaskFilter = Data.TaskFilterValaues[tf];
+        if (this.data.TaskFilter!=Data.TaskFilterValues[tf]) {
+            this.data.TaskFilter = Data.TaskFilterValues[tf];
             this.updateTaskFilter();
+            changed = true;
+        }
+
+        let uf = this.userFilter.value.length==0 ? 0 : this.userFilter.value[0].beginIndex;
+        if (this.data.UserFilter!=this.data.UserFilterValues[uf]) {
+            this.data.UserFilter = this.data.UserFilterValues[uf];
+            this.updateUserFilter();
             changed = true;
         }
 
@@ -79,8 +87,13 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
     }
 
     private updateTaskFilter(): void {
-        let idx = Data.TaskFilterValaues.findIndex(it => it==this.data.TaskFilter);
+        let idx = Data.TaskFilterValues.findIndex(it => it==this.data.TaskFilter);
         if (idx>=0) this.tasksFilter.select(idx);
+    }
+
+    private updateUserFilter(): void {
+        let idx = this.data.UserFilterValues.findIndex(it => it==this.data.UserFilter);
+        if (idx>=0) this.userFilter.select(idx);
     }
 
     private async openWorkItemClick(id: string) {
@@ -121,10 +134,20 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
 
                     <KeywordFilterBarItem filterItemKey="Placeholder" />
 
+                    {/* <DropdownFilterBarItem
+                        filterItemKey="userFilter"
+                        filter={this.filter}
+                        items={this.data.UserFilterValues}
+                        selection={this.userFilter}
+                        placeholder="User"
+                        showPlaceholderAsLabel={false}
+                        hideClearAction={true}
+                    /> */}
+
                     <DropdownFilterBarItem
                         filterItemKey="tasksFilter"
                         filter={this.filter}
-                        items={Data.TaskFilterValaues}
+                        items={Data.TaskFilterValues}
                         selection={this.tasksFilter}
                         placeholder="Tasks"
                         showPlaceholderAsLabel={false}
