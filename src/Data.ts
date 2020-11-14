@@ -1,33 +1,17 @@
-import * as SDK from "azure-devops-extension-sdk";
-import { ToolsSetup } from "./Tools";
+import React = require("react");
 
-import { 
-    getClient,
-    CommonServiceIds, 
-    IProjectPageService,
-    IProjectInfo
-} from "azure-devops-extension-api";
-import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
-import * as TfsClient from "azure-devops-extension-api/Work/WorkClient";
-import * as TfsWork from "azure-devops-extension-api/Work";
 import * as TfsGit from "azure-devops-extension-api/Git";
-
+import { getClient } from "azure-devops-extension-api";
 import { ITreeItem, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
-import { IListBoxItem } from "azure-devops-ui/ListBox";
-
 import { ISimpleTableCell } from "azure-devops-ui/Table";
 import { ISimpleListCell } from "azure-devops-ui/List";
+
 import { Styles } from "./Styles";
-import React = require("react");
 import { LinkItem } from "./LinkItem";
+import { SettingsData } from "./SettingsData";
+import { ToolsSetup } from "./Tools";
 
-
-export interface IIterationItem {
-    id: string;
-    text: string;
-    iteration: TfsWork.TeamSettingsIteration;
-}
 
 export interface IWorkItem extends ISimpleTableCell {
     id: string;
@@ -41,17 +25,20 @@ export interface IWorkItem extends ISimpleTableCell {
 
 export class Data {
 
-    CurrentProject?: IProjectInfo;
-    CurrentUser?: SDK.IUserContext;
-    CurrentIterationPath = "";
+    Settings: SettingsData;
+
+    OnRefreshing?: () => void;
 
     WorkItems: ITreeItem<IWorkItem>[] = [];
-    Iterations: IListBoxItem<IIterationItem>[] = [];
 
     TaskFilter = "Current";
     static TaskFilterValues = ["Current", "New+Current", "Done", "All"];
     UserFilter = "@me";
     UserFilterValues = ["@me"];
+
+    constructor() {
+        this.Settings = SettingsData.create(this);
+    }
 
     static LoadingItem: ITreeItem<IWorkItem> = {
         childItems: [],
@@ -72,109 +59,28 @@ export class Data {
     };
     WorkItemsProvider = new TreeItemProvider<IWorkItem>([Data.LoadingItem]);
 
-    async initialize(): Promise<void> {
-        await SDK.ready();
+    async refresh() {
+        if (!this.Settings.isReady) return;
 
-        await this.loadProject();
-        if (!this.CurrentProject) return;
-
-        this.Iterations = await this.loadIterations();
         this.WorkItems = await this.loadItems();
         this.WorkItemsProvider = new TreeItemProvider(this.WorkItems);
+
+        if (this.OnRefreshing) this.OnRefreshing();
     }
 
-    private async loadProject(): Promise<void> {
-        const navService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
-        this.CurrentProject = await navService.getProject();
-        this.CurrentUser = SDK.getUser();
-    }
-
-    async reloadItems() {
-        this.WorkItems = await this.loadItems();
-        this.WorkItemsProvider = new TreeItemProvider(this.WorkItems);
-    }
-
-    private async loadIterations(): Promise<IListBoxItem<IIterationItem>[]> {
-        if (!this.CurrentProject) return [];
-
-        let coreClient = getClient(TfsCore.CoreRestClient);
-        let workClient = getClient(TfsClient.WorkRestClient);
-
-        let projectId = this.CurrentProject.id;
-
-        let teams = await coreClient.getTeams(this.CurrentProject.id, true, 50);
-
-        let titerations = await Promise.all(teams.map(team => {
-            let teamContext: TfsCore.TeamContext = { projectId: projectId, teamId: team.id, project: "", team: "" };
-            return workClient.getTeamIterations(teamContext);
-        }));
-
-
-        let time = new Date().getTime() - 40*24*60*60*1000;
-        let iterations: TfsWork.TeamSettingsIteration[] = [];
-        for (const tit of titerations) {
-            for (const it of tit) {
-                if (!it.attributes.finishDate || it.attributes.finishDate.getTime()>time) 
-                    if (iterations.findIndex(i => it.id==i.id)<=0)
-                        iterations.push(it);
-            }
-        }
-
-        let iterIdx = iterations.findIndex(i => Data.isCurrentIteration(i));
-        if (iterIdx<0) iterIdx = iterations.findIndex(i => Data.isCurrentIteration2(i));
-
-        if (iterIdx<0 && iterations.length>0) iterIdx = iterations.length-1;
-        this.CurrentIterationPath = iterIdx<0 ? "" : iterations[iterIdx].path;
-
-        return iterations.map(it => { 
-            let sufix = "";
-            if (this.CurrentIterationPath==it.path) sufix += " (Current)";
-            return { 
-                id: it.path, 
-                text: it.name+sufix,
-                iteration: it,
-                iconProps: { iconName: "Sprint" }
-            }; 
-        });
-    }
-
-    private static isCurrentIteration(iter: TfsWork.TeamSettingsIteration): boolean {
-        let dt = Date.now();
-        
-        let start = iter.attributes.startDate;
-        if (!start) start = new Date();
-
-        let finish = iter.attributes.finishDate;
-        if (!finish) finish = new Date();
-        finish.setDate(finish.getDate()+1);
-
-        return start.getTime()<=dt && dt<finish.getTime();
-    }
-
-    private static isCurrentIteration2(iter: TfsWork.TeamSettingsIteration): boolean {
-        let dt = Date.now();
-        
-        let start = iter.attributes.startDate;
-        if (!start || dt>start.getTime()) return false;
-
-        let finish = iter.attributes.finishDate;
-        if (finish && dt>finish.getTime()) return false;
-
-        return true;
-    }
 
     AllItems: TfsWIT.WorkItem[] = [];
     AllLinks: TfsWIT.WorkItemLink[] = [];
 
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
-        if (!this.CurrentProject) return [];
+        if (!this.Settings.isReady) return [];
         
         try {
             const client = getClient(TfsWIT.WorkItemTrackingRestClient);
 
             let iter = "@CurrentIteration";
-            if (this.CurrentIterationPath)
-                iter = "'"+this.CurrentIterationPath+"'";
+            if (this.Settings.CurrentIterationPath)
+                iter = "'"+this.Settings.CurrentIterationPath+"'";
             let user = this.UserFilter;
             if (user.substring(0, 1)!="@")
                 user = "'"+user+"'";
@@ -209,8 +115,8 @@ export class Data {
             };
 
             let top = await Promise.all([
-                client.queryByWiql(topWiql, this.CurrentProject.id),
-                client.queryByWiql(topWiql2, this.CurrentProject.id)
+                client.queryByWiql(topWiql, this.Settings.CurrentProject.id),
+                client.queryByWiql(topWiql2, this.Settings.CurrentProject.id)
             ]);
 
             if (!top[0] || !top[1]) return [];
@@ -222,11 +128,11 @@ export class Data {
             let childrenWiql = {
                 query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
             };
-            let childrenRels = await client.queryByWiql(childrenWiql, this.CurrentProject.id);
+            let childrenRels = await client.queryByWiql(childrenWiql, this.Settings.CurrentProject.id);
             this.AllLinks = childrenRels.workItemRelations;
             let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
             
-            this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.CurrentProject.id, 
+            this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.Settings.CurrentProject.id, 
                 undefined, undefined,
                 TfsWIT.WorkItemExpand.Relations);
 
@@ -355,7 +261,7 @@ export class Data {
         if (!release) release = it.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
 
         let isActive = state=="Active" || state=="Ready";
-        let isMy = assigned && this.CurrentUser && assigned.uniqueName==this.CurrentUser.name;
+        let isMy = assigned && this.Settings.CurrentUser && assigned.uniqueName==this.Settings.CurrentUser.name;
 
         let n = 0;
         let rels : React.ReactNode[] = this

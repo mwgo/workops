@@ -22,29 +22,39 @@ interface ITodoListTabState {
     version: number;
 }
 
-export class TodoListTab extends React.Component<{}, ITodoListTabState> {
+interface ITodoListTabProps {
+    data: Data;
+}
+
+export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTabState> {
     
-    private data = new Data();
     private filter: Filter;
     private iterationList = new DropdownSelection();
     private tasksFilter = new DropdownSelection();
     private userFilter = new DropdownSelection();
 
-    constructor(props: {}) {
+    constructor(props: ITodoListTabProps) {
         super(props);
 
         this.filter = new Filter();
         this.filter.subscribe(() => this.filterChanged(), FILTER_CHANGE_EVENT);
 
-        this.state = {
-            version: 0
-        };
+        this.state = { version: 0 };
+    }
+
+    get data(): Data {
+        return this.props.data;
     }
 
     public async componentDidMount() {
-        await this.data.initialize();
+        await SDK.ready();
 
-        this.setState({ version: this.state.version+1 });
+        this.props.data.OnRefreshing = () => {
+            this.updateIterationIndex();
+            this.setState({ version: this.state.version+1 })
+        };
+
+        await this.data.refresh();
 
         this.updateIterationIndex();
         this.updateTaskFilter();
@@ -54,35 +64,38 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
     private async filterChanged() {
         let changed = false;
 
-        let idx = this.iterationList.value[0].beginIndex;
-        if (this.data.Iterations[idx].id!=this.data.CurrentIterationPath) {
-            this.data.CurrentIterationPath = this.data.Iterations[idx].id;
-            this.updateIterationIndex();
-            changed = true;
+        if (this.iterationList.value.length>0) {
+            let idx = this.iterationList.value[0].beginIndex;
+            if (this.data.Settings.Iterations[idx].id!=this.data.Settings.CurrentIterationPath) {
+                this.data.Settings.CurrentIterationPath = this.data.Settings.Iterations[idx].id;
+                this.updateIterationIndex();
+                changed = true;
+            }
         }
 
-        let tf = this.tasksFilter.value.length==0 ? 0 : this.tasksFilter.value[0].beginIndex;
-        if (this.data.TaskFilter!=Data.TaskFilterValues[tf]) {
-            this.data.TaskFilter = Data.TaskFilterValues[tf];
-            this.updateTaskFilter();
-            changed = true;
+        if (this.tasksFilter.value.length>0) {
+            let tf = this.tasksFilter.value[0].beginIndex;
+            if (this.data.TaskFilter!=Data.TaskFilterValues[tf]) {
+                this.data.TaskFilter = Data.TaskFilterValues[tf];
+                this.updateTaskFilter();
+                changed = true;
+            }
         }
 
-        let uf = this.userFilter.value.length==0 ? 0 : this.userFilter.value[0].beginIndex;
-        if (this.data.UserFilter!=this.data.UserFilterValues[uf]) {
-            this.data.UserFilter = this.data.UserFilterValues[uf];
-            this.updateUserFilter();
-            changed = true;
+        if (this.userFilter.value.length>0) {
+            let uf = this.userFilter.value[0].beginIndex;
+            if (this.data.UserFilter!=this.data.UserFilterValues[uf]) {
+                this.data.UserFilter = this.data.UserFilterValues[uf];
+                this.updateUserFilter();
+                changed = true;
+            }
         }
 
-        if (changed) {
-            await this.data.reloadItems();
-            this.setState({ version: this.state.version+1 });
-        }
+        if (changed) this.data.refresh();
     }
 
     private updateIterationIndex(): void {
-        let idx = this.data.Iterations.findIndex(it => it.id==this.data.CurrentIterationPath);
+        let idx = this.data.Settings.Iterations.findIndex(it => it.id==this.data.Settings.CurrentIterationPath);
         if (idx>=0) this.iterationList.select(idx);
     }
 
@@ -157,7 +170,7 @@ export class TodoListTab extends React.Component<{}, ITodoListTabState> {
                     <DropdownFilterBarItem
                         filterItemKey="iterationList"
                         filter={this.filter}
-                        items={this.data.Iterations}
+                        items={this.data.Settings.Iterations}
                         selection={this.iterationList}
                         placeholder="Iteration"
                         showPlaceholderAsLabel={false}

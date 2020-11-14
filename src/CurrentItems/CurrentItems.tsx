@@ -12,6 +12,7 @@ import { Page } from "azure-devops-ui/Page";
 import { TodoListTab } from "./TodoListTab";
 import { TodoBoardTab } from "./TodoBoardTab";
 import { showRootComponent } from "../Common";
+import { Data } from "../Data";
 
 interface ICurrentItemsHubState {
     selectedTabId: string,
@@ -20,6 +21,8 @@ interface ICurrentItemsHubState {
 }
 
 class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
+
+    private readonly data = new Data();
 
     constructor(props: {}) {
         super(props);
@@ -39,8 +42,9 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
         return (
             <Page className="sample-hub flex-grow">
                 <Header title="Current Work"
-                    // commandBarItems={this.getCommandBarItems()}
+                    commandBarItems={this.getCommandBarItems()}
                     titleSize={TitleSize.Medium} />
+                <TodoListTab data={this.data} />
                 {/* <TabBar
                     onSelectedTabChanged={this.onSelectedTabChanged}
                     selectedTabId={this.state.selectedTabId}
@@ -48,50 +52,37 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
 
                     <Tab name="Board" id="board" />
                     <Tab name="List" id="list" />
-                </TabBar> */}
-                {this.getPageContent()}
+                </TabBar>
+                {this.getPageContent()} */}
             </Page>
         );
     }
 
-    private onSelectedTabChanged = (newTabId: string) => {
-        this.setState({
-            selectedTabId: newTabId
-        })
-    }
+    // private onSelectedTabChanged = (newTabId: string) => {
+    //     this.setState({
+    //         selectedTabId: newTabId
+    //     })
+    // }
 
-    private getPageContent() {
-        const { selectedTabId } = this.state;
-        if (selectedTabId === "list") {
-            return <TodoListTab />;
-        }
-        else if (selectedTabId === "board") {
-            return <TodoBoardTab />;
-        }
-    }
+    // private getPageContent() {
+    //     const { selectedTabId } = this.state;
+    //     if (selectedTabId === "list") {
+    //         return <TodoListTab />;
+    //     }
+    //     else if (selectedTabId === "board") {
+    //         return <TodoBoardTab />;
+    //     }
+    // }
 
     
     private getCommandBarItems(): IHeaderCommandBarItem[] {
         return [
             {
-              id: "panel",
-              text: "Panel",
-              onActivate: () => { this.onPanelClick() },
-              iconProps: {
-                iconName: 'Add'
-              },
-              isPrimary: true,
-              tooltipProps: {
-                text: "Open a panel with custom extension content"
-              }
-            },
-            {
-              id: "messageDialog",
-              text: "Message",
-              onActivate: () => { this.onMessagePromptClick() },
-              tooltipProps: {
-                text: "Open a simple message dialog"
-              }
+                id: "refreshList",
+                iconProps: {
+                    iconName: "Refresh"
+                },
+                onActivate: () => { this.onRefreshListClick() },
             },
             {
                 id: "fullScreen",
@@ -101,55 +92,75 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
                 },
                 onActivate: () => { this.onToggleFullScreenMode() }
             },
-            {
-              id: "customDialog",
-              text: "Custom Dialog",
-              onActivate: () => { this.onCustomPromptClick() },
-              tooltipProps: {
-                text: "Open a dialog with custom extension content"
-              }
-            }
+            // {
+            //   id: "panel",
+            //   text: "Panel",
+            //   onActivate: () => { this.onPanelClick() },
+            //   iconProps: {
+            //     iconName: 'Add'
+            //   },
+            //   isPrimary: true,
+            //   tooltipProps: {
+            //     text: "Open a panel with custom extension content"
+            //   }
+            // },
+            // {
+            //   id: "messageDialog",
+            //   text: "Message",
+            //   onActivate: () => { this.onMessagePromptClick() },
+            //   tooltipProps: {
+            //     text: "Open a simple message dialog"
+            //   }
+            // },
+            // {
+            //   id: "customDialog",
+            //   text: "Custom Dialog",
+            //   onActivate: () => { this.onCustomPromptClick() },
+            //   tooltipProps: {
+            //     text: "Open a dialog with custom extension content"
+            //   }
+            // }
         ];
     }
 
-    private async onMessagePromptClick(): Promise<void> {
-        const dialogService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
-        dialogService.openMessageDialog("Use large title?", {
-            showCancel: true,
-            title: "Message dialog",
-            onClose: (result) => {
-            }
-        });
-    }
+    // private async onMessagePromptClick(): Promise<void> {
+    //     const dialogService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
+    //     dialogService.openMessageDialog("Use large title?", {
+    //         showCancel: true,
+    //         title: "Message dialog",
+    //         onClose: (result) => {
+    //         }
+    //     });
+    // }
 
-    private async onCustomPromptClick(): Promise<void> {
-        const dialogService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
-        dialogService.openCustomDialog<boolean | undefined>(SDK.getExtensionContext().id + ".panel-content", {
-            title: "Custom dialog",
-            configuration: {
-                message: "Use compact pivots?",
-                initialValue: this.state.useCompactPivots
-            },
-            onClose: (result) => {
-                if (result !== undefined) {
-                    this.setState({ useCompactPivots: result });
-                }
-            }
-        });
-    }
+    // private async onCustomPromptClick(): Promise<void> {
+    //     const dialogService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
+    //     dialogService.openCustomDialog<boolean | undefined>(SDK.getExtensionContext().id + ".panel-content", {
+    //         title: "Custom dialog",
+    //         configuration: {
+    //             message: "Use compact pivots?",
+    //             initialValue: this.state.useCompactPivots
+    //         },
+    //         onClose: (result) => {
+    //             if (result !== undefined) {
+    //                 this.setState({ useCompactPivots: result });
+    //             }
+    //         }
+    //     });
+    // }
 
-    private async onPanelClick(): Promise<void> {
-        const panelService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
-        panelService.openPanel<boolean | undefined>(SDK.getExtensionContext().id + ".panel-content", {
-            title: "My Panel",
-            description: "Description of my panel",
-            configuration: {
-                message: "Show header description?"
-            },
-            onClose: (result) => {
-            }
-        });
-    }
+    // private async onPanelClick(): Promise<void> {
+    //     const panelService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
+    //     panelService.openPanel<boolean | undefined>(SDK.getExtensionContext().id + ".panel-content", {
+    //         title: "My Panel",
+    //         description: "Description of my panel",
+    //         configuration: {
+    //             message: "Show header description?"
+    //         },
+    //         onClose: (result) => {
+    //         }
+    //     });
+    // }
 
     private async initializeFullScreenState() {
         const layoutService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
@@ -166,6 +177,11 @@ class CurrentItemsHub extends React.Component<{}, ICurrentItemsHubState> {
         const layoutService = await SDK.getService<IHostPageLayoutService>(CommonServiceIds.HostPageLayoutService);
         layoutService.setFullScreenMode(fullScreenMode);
     }
+
+    private async onRefreshListClick() {
+        this.data.refresh();
+    }
+    
 }
 
 showRootComponent(<CurrentItemsHub />);
