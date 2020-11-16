@@ -1,5 +1,6 @@
 import React = require("react");
 
+import * as SDK from "azure-devops-extension-sdk";
 import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 import * as TfsGit from "azure-devops-extension-api/Git";
 import { getClient } from "azure-devops-extension-api";
@@ -11,6 +12,7 @@ import { Styles } from "./Styles";
 import { LinkItem } from "./LinkItem";
 import { SettingsData } from "./SettingsData";
 import { ToolsSetup } from "./Tools";
+import { IIconProps } from "azure-devops-ui/Icon";
 
 
 export interface IWorkItem extends ISimpleTableCell {
@@ -36,9 +38,9 @@ export class Data {
     UserFilter = "@me";
     UserFilterValues = ["@me"];
 
-    constructor() {
-        this.Settings = SettingsData.create(this);
-    }
+    AllItems: TfsWIT.WorkItem[] = [];
+    AllLinks: TfsWIT.WorkItemLink[] = [];
+    AllMyPrs: TfsGit.GitPullRequest[] = [];
 
     static LoadingItem: ITreeItem<IWorkItem> = {
         childItems: [],
@@ -59,6 +61,10 @@ export class Data {
     };
     WorkItemsProvider = new TreeItemProvider<IWorkItem>([Data.LoadingItem]);
 
+    constructor() {
+        this.Settings = SettingsData.create(this);
+    }
+
     async refresh() {
         if (!this.Settings.isReady) return;
 
@@ -69,91 +75,169 @@ export class Data {
     }
 
 
-    AllItems: TfsWIT.WorkItem[] = [];
-    AllLinks: TfsWIT.WorkItemLink[] = [];
-
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
         if (!this.Settings.isReady) return [];
         
         try {
-            const client = getClient(TfsWIT.WorkItemTrackingRestClient);
-
-            let iter = "@CurrentIteration";
-            if (this.Settings.CurrentIterationPath)
-                iter = "'"+this.Settings.CurrentIterationPath+"'";
-            let user = this.UserFilter;
-            if (user.substring(0, 1)!="@")
-                user = "'"+user+"'";
-    
-            let stateFilter = "'Ready', 'Active'";
-            if (this.TaskFilter=="New+Current")
-                stateFilter = "'New', 'Ready', 'Active'";
-            if (this.TaskFilter=="Done")
-                stateFilter = "'Resolved', 'Closed'";
-            if (this.TaskFilter=="All")
-                stateFilter = "'New', 'Ready', 'Active', 'Resolved', 'Closed', 'Removed'";
-    
-            let topWiql = {
-                query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
-                            " AND [Target].[System.AssignedTo]="+user+
-                            " AND [Target].[Iteration Path]="+iter+
-                            " AND [Target].[System.WorkItemType]='Task'"+
-                            " AND [Target].[System.State] IN ("+stateFilter+")"
-            };
-
-            stateFilter = "'Ready', 'Active'";
-            if (this.TaskFilter=="Done")
-                stateFilter = "'Closed'";
-            if (this.TaskFilter=="All")
-                stateFilter = "'Ready', 'Active', 'Closed'";
-
-            let topWiql2 = {
-                query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]="+user+
-                            " AND [Iteration Path]="+iter+
-                            " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
-                            " AND [System.State] IN ("+stateFilter+")"
-            };
-
-            let top = await Promise.all([
-                client.queryByWiql(topWiql, this.Settings.CurrentProject.id),
-                client.queryByWiql(topWiql2, this.Settings.CurrentProject.id)
-            ]);
-
-            if (!top[0] || !top[1]) return [];
-
-            let topItems = top[0].workItemRelations.filter(item => !item.rel).map(item => item.target.id);
-            topItems = topItems.concat(top[1].workItems.map(item => item.id));
-            if (topItems.length==0) return [];
-
-            let childrenWiql = {
-                query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
-            };
-            let childrenRels = await client.queryByWiql(childrenWiql, this.Settings.CurrentProject.id);
-            this.AllLinks = childrenRels.workItemRelations;
-            let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
-            
-            this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.Settings.CurrentProject.id, 
-                undefined, undefined,
-                TfsWIT.WorkItemExpand.Relations);
-
-            this.updateUsers();
-                
-            let stories = this.AllItems.filter(it => it.fields["System.WorkItemType"]!="Task")
-
-            let areas = stories
-                .map(it => it.fields["System.AreaPath"] as string)
-                .sort();
-            areas = areas.filter((item, idx) => areas.indexOf(item)==idx); 
-
-            let result = areas.map(a => this.getAreaItem(a, stories));
-
-            return result;
+            let tt = await Promise.all([this.loadWorkItems(), this.loadPullRequests()]);
+            return tt[0].concat(tt[1]);
         }
         catch (e) {
-            return [];
+            return [{data: {
+                id: "error",
+                title: { 
+                    text: e.toString(),
+                    iconProps: Styles.ErrorIcon
+                },
+                state: {
+                    text: ""
+                },
+                assignedTo: "",
+                area: "",
+                priority: 0
+            }}];
         }
     }
 
+    private async loadWorkItems(): Promise<ITreeItem<IWorkItem>[]> {
+        const client = getClient(TfsWIT.WorkItemTrackingRestClient);
+
+        let iter = "@CurrentIteration";
+        if (this.Settings.CurrentIterationPath)
+            iter = "'"+this.Settings.CurrentIterationPath+"'";
+        let user = this.UserFilter;
+        if (user.substring(0, 1)!="@")
+            user = "'"+user+"'";
+
+        let stateFilter = "'Ready', 'Active'";
+        if (this.TaskFilter=="New+Current")
+            stateFilter = "'New', 'Ready', 'Active'";
+        if (this.TaskFilter=="Done")
+            stateFilter = "'Resolved', 'Closed'";
+        if (this.TaskFilter=="All")
+            stateFilter = "'New', 'Ready', 'Active', 'Resolved', 'Closed', 'Removed'";
+
+        let topWiql = {
+            query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
+                        " AND [Target].[System.AssignedTo]="+user+
+                        " AND [Target].[Iteration Path]="+iter+
+                        " AND [Target].[System.WorkItemType]='Task'"+
+                        " AND [Target].[System.State] IN ("+stateFilter+")"
+        };
+
+        stateFilter = "'Ready', 'Active'";
+        if (this.TaskFilter=="Done")
+            stateFilter = "'Closed'";
+        if (this.TaskFilter=="All")
+            stateFilter = "'Ready', 'Active', 'Closed'";
+
+        let topWiql2 = {
+            query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]="+user+
+                        " AND [Iteration Path]="+iter+
+                        " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
+                        " AND [System.State] IN ("+stateFilter+")"
+        };
+
+        let top = await Promise.all([
+            client.queryByWiql(topWiql, this.Settings.CurrentProject.id),
+            client.queryByWiql(topWiql2, this.Settings.CurrentProject.id)
+        ]);
+
+        if (!top[0] || !top[1]) return [];
+
+        let topItems = top[0].workItemRelations.filter(item => !item.rel).map(item => item.target.id);
+        topItems = topItems.concat(top[1].workItems.map(item => item.id));
+        if (topItems.length==0) return [];
+
+        let childrenWiql = {
+            query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
+        };
+        let childrenRels = await client.queryByWiql(childrenWiql, this.Settings.CurrentProject.id);
+        this.AllLinks = childrenRels.workItemRelations;
+        let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
+        
+        this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.Settings.CurrentProject.id, 
+            undefined, undefined,
+            TfsWIT.WorkItemExpand.Relations);
+
+        this.updateUsers();
+            
+        let stories = this.AllItems.filter(it => it.fields["System.WorkItemType"]!="Task")
+
+        let areas = stories
+            .map(it => it.fields["System.AreaPath"] as string)
+            .sort();
+        areas = areas.filter((item, idx) => areas.indexOf(item)==idx); 
+
+        let result = areas.map(a => this.getAreaItem(a, stories));
+
+        return result;
+    }
+    
+    private async loadPullRequests(): Promise<ITreeItem<IWorkItem>[]> {
+
+        const tfs = getClient(TfsGit.GitRestClient);
+        const repositoryId = "soneta.git";
+        const projectName = "Soneta";
+
+        let prs = await tfs.getPullRequests(repositoryId, {
+            creatorId: this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
+            includeLinks: false,
+            repositoryId: repositoryId,
+            reviewerId: "", 
+            sourceRefName: "",
+            sourceRepositoryId: "",
+            status: TfsGit.PullRequestStatus.Active,
+            targetRefName: ""
+        }, projectName);
+
+        prs = prs.filter(pr => !pr.isDraft);
+
+        let threads = await Promise.all(prs.map(pr => tfs.getThreads(repositoryId, pr.pullRequestId, projectName)));
+        let nthreads = threads.map(
+            tt => tt.filter(
+                        t => t.status==TfsGit.CommentThreadStatus.Active || t.status==TfsGit.CommentThreadStatus.Pending)
+                    .length);
+        let statuses = nthreads.map((n, idx) => this.calcPrStatus(prs[idx], n));
+
+        if (this.TaskFilter!="All") {
+            for (let i = prs.length; --i>=0;) {
+                let ok = this.TaskFilter=="Done" ? !statuses[i] : !!statuses[i];
+                if (!ok) {
+                    statuses.splice(i, 1);
+                    prs.splice(i, 1);
+                }
+            }
+        }
+
+        if (prs.length==0) return [];
+
+        this.AllMyPrs = prs;
+
+        let items = prs
+                .map((pr, idx) => ({
+                    data: this.getTreePullRequest(pr, statuses[idx]),
+                    expanded: false
+                }));
+
+        return [this.createGroup(
+            "pr_my",
+            "Pull Requests created by Me",
+            Styles.PrIcon,
+            items
+        )];
+    }
+
+    private calcPrStatus(pr: TfsGit.GitPullRequest, nComments: number): string {
+        if (pr.reviewers.some(r => r.vote<0)) return "Waiting";
+        if (nComments==1) return "Comment";
+        if (nComments>1) return nComments+" comments";
+        if (pr.reviewers.some(r => r.isRequired && r.vote==0)) return "";
+        if (pr.reviewers.some(r => !r.isRequired)) 
+            if (pr.reviewers.every(r => !r.isRequired && r.vote==0)) return "";
+        return "Ready";
+    }
+    
     private updateUsers(): void {
         this.UserFilterValues = [];
         for (const wi of this.AllItems) {
@@ -170,19 +254,28 @@ export class Data {
     }
 
     private getAreaItem(path: string, items: TfsWIT.WorkItem[]): ITreeItem<IWorkItem> {
-        return {
-            childItems: items
+        return this.createGroup(
+            "area"+path,
+            path,
+            Styles.AreaIcon,
+            items
                 .filter(it => it.fields["System.AreaPath"]==path)
                 .map(it => ({
                     childItems: this.getTreeChildren(it),
                     data: this.getTreeItem(it),
                     expanded: false
-                })),
+                }))
+        );
+    }
+
+    private createGroup(id: string, name: string, icon: IIconProps, children?: ITreeItem<IWorkItem>[]): ITreeItem<IWorkItem> {
+        return {
+            childItems: children,
             data: {
-                id: "area"+path,
+                id: id,
                 title: { 
-                    text: path,
-                    iconProps: Styles.AreaIcon,
+                    text: name,
+                    iconProps: icon,
                     textClassName: "currentlist-area-text"
                 },
                 state: {
@@ -296,9 +389,9 @@ export class Data {
             )));
         }
 
-        let result = {
+        let result: IWorkItem = {
             // workItem: it,
-            id: it.id.toString(),
+            id: "item"+it.id,
             title: { 
                 text: it.id + ": " + it.fields["System.Title"] as string,
                 textNode: textNode,
@@ -318,6 +411,93 @@ export class Data {
         return result;
     }
 
+    private getTreePullRequest(pr: TfsGit.GitPullRequest, status: string): IWorkItem {
+        let textNode: React.ReactNode = pr.pullRequestId + ": " + pr.title;
+
+        let url = pr.url;
+        url = url.replace("/_apis/git/repositories/", "/_git/");
+        url = url.substring(0, url.indexOf("/pullRequests/"));
+        url = url+"?version=GB";
+
+        let sourceBranch = Data.prepareBranchName(pr.sourceRefName);
+        let targetBranch = Data.prepareBranchName(pr.targetRefName);
+
+        this.LinksInfo[sourceBranch] = {
+            name: sourceBranch,
+            title: sourceBranch,
+            url: url+sourceBranch.replace("/", "%2f")
+        };
+        this.LinksInfo[targetBranch] = {
+            name: targetBranch,
+            title: targetBranch,
+            url: url+targetBranch.replace("/", "%2f")
+        };
+
+        let rels : React.ReactNode[] = [
+            React.createElement(LinkItem, {
+                Data: this, 
+                Link: sourceBranch, 
+                ID: -1, 
+                Icon: Styles.LinkBranchIconName, 
+                key: "pr_source"+pr.pullRequestId
+            }),
+            " ",
+            React.createElement(LinkItem, {
+                Data: this, 
+                Link: targetBranch, 
+                ID: -1, 
+                Icon: Styles.LinkTargetBranchIconName, 
+                key: "pr_target"+pr.pullRequestId
+            })
+        ];
+
+        textNode = React.createElement("div", null,
+            textNode,
+            React.createElement("div", null,
+                React.createElement("small", null, 
+                    rels
+        )));
+
+        let result: IWorkItem = {
+            id: "pr"+pr.pullRequestId,
+            title: { 
+                text: pr.pullRequestId + ": " + pr.title,
+                textNode: textNode,
+                iconProps: Styles.PrIcon
+            },
+            state: {
+                text: status || "Done",
+                iconProps: status ? Styles.PrStateActive : Styles.PrStateCompleted
+            },
+            assignedTo: pr.createdBy.displayName,
+            area: Data.prepareRef(pr.sourceRefName).replace("releases/", ""),
+            priority: 0,
+            release: Data.prepareRef(pr.targetRefName).replace("releases/", "")
+        };
+
+        return result;
+    }
+
+    private static prepareBranchName(name: string) {
+        let t = name.split("/");
+        t.shift();
+        t.shift();
+        return t.join("/");
+    }
+
+    async openItem(id: string) {
+        if (id.substring(0, 4)=="item") {
+            const navSvc = await SDK.getService<TfsWIT.IWorkItemFormNavigationService>(TfsWIT.WorkItemTrackingServiceIds.WorkItemFormNavigationService);
+            navSvc.openWorkItem(parseInt(id.substring(4)));
+        }
+        else if (id.substring(0, 2)=="pr") {
+            let prid = parseInt(id.substring(2));
+            let pr = this.AllMyPrs.first(p => p.pullRequestId==prid);
+            let url = Data.preparePrUrl(pr.url);
+            open(url, "_blank");
+        }
+    };
+
     //
     // LINKS
     //
@@ -326,11 +506,13 @@ export class Data {
     LinksInfo: { [link: string]: { name: string, title: string, url: string } } = {};
 
     toggle(item: ITreeItem<IWorkItem>): void {
-        let id = parseInt(item.data.id);
-        let witem = this.AllItems.find(it => it.id==id);
-        if (!witem) return;
+        if (item.data.id.substring(0, 4)=="item") {
+            let id = parseInt(item.data.id.substring(4));
+            let witem = this.AllItems.find(it => it.id==id);
+            if (!witem) return;
 
-        this.retrieveLinks(this.getRecursiveItems(witem));
+            this.retrieveLinks(this.getRecursiveItems(witem));
+        }
 
         this.WorkItemsProvider.toggle(item);
     }
@@ -363,9 +545,7 @@ export class Data {
 
             let pr = await tfs.getPullRequestById(parseInt(args[2]), args[0]);
 
-            let url = pr.url;
-            url = url.replace("/_apis/git/repositories/", "/_git/");
-            url = url.replace("/pullRequests/", "/pullrequest/");
+            let url = Data.preparePrUrl(pr.url);
 
             this.LinksInfo[l.type+l.link] = {
                 name: "!"+pr.pullRequestId + (pr.status==3 ? " [C]" : pr.status==2 ? " [D]" : ""),
@@ -428,6 +608,13 @@ export class Data {
     private static prepareRef(s: string): string {
         return s.startsWith("refs/heads/") ? s.substring(11) : s;
     }
+
+    private static preparePrUrl(url: string): string {
+        url = url.replace("/_apis/git/repositories/", "/_git/");
+        url = url.replace("/pullRequests/", "/pullrequest/");
+        return url;
+    }
+
 }
 
 ToolsSetup();

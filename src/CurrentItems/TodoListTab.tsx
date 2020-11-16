@@ -1,6 +1,5 @@
 import * as React from "react";
 import * as SDK from "azure-devops-extension-sdk";
-import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 
 import { Card } from "azure-devops-ui/Card";
 import { Tree } from "azure-devops-ui/TreeEx";
@@ -109,11 +108,6 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
         if (idx>=0) this.userFilter.select(idx);
     }
 
-    private async openWorkItemClick(id: string) {
-        const navSvc = await SDK.getService<TfsWIT.IWorkItemFormNavigationService>(TfsWIT.WorkItemTrackingServiceIds.WorkItemFormNavigationService);
-        navSvc.openWorkItem(parseInt(id));
-    };
-
     private columns = [
         {
             id: "title",
@@ -124,7 +118,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
             id: "state",
             name: "State",
             renderCell: renderTreeCell,
-            width: 100
+            width: 130
         },{
             id: "assignedTo",
             name: "Assigned To",
@@ -186,7 +180,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                         columns={this.columns}
                         onToggle={(event, item) => this.data.toggle(item.underlyingItem)}
                         onSelect={(event, item) => {
-                            this.openWorkItemClick(item.data.underlyingItem.data.id);
+                            this.data.openItem(item.data.underlyingItem.data.id);
                             event.preventDefault();
                         }}
                         scrollable={true}

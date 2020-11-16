@@ -8,7 +8,15 @@ export class Styles {
 
     static LoadingIcon: IIconProps = { iconName: "ProgressRingDots", style: { color: "#000000"} };
 
+    static ErrorIcon: IIconProps = { iconName: "Error", style: { color: "#ff0000"} };
+
     static AreaIcon: IIconProps = { iconName: "StatusCircleInner", style: { color: "#000000"} };
+
+    static PrIcon: IIconProps = { iconName: "BranchPullRequest", style: { color: "#000000"} };
+
+    static LinkBranchIconName = "BranchFork2";
+
+    static LinkTargetBranchIconName = "ChevronRightMed";
 
     static LinksIcon: { [lisk: string]: string } = {
         "pr": "BranchPullRequest",
@@ -37,4 +45,6 @@ export class Styles {
         "Removed": { iconName: "StatusCircleRing", style: { color: "#b2b2b2"} },
     };
 
+    static PrStateActive: IIconProps = { iconName: "StatusCircleInner", style: { color: "#007acc"} };
+    static PrStateCompleted: IIconProps = { iconName: "StatusCircleInner", style: { color: "#339933"} };
 }
