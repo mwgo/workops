@@ -13,6 +13,7 @@ import { LinkItem } from "./LinkItem";
 import { SettingsData } from "./SettingsData";
 import { ToolsSetup } from "./Tools";
 import { IIconProps } from "azure-devops-ui/Icon";
+import { PrInfo } from "./PrInfo";
 
 
 export interface IWorkItem extends ISimpleTableCell {
@@ -40,7 +41,7 @@ export class Data {
 
     AllItems: TfsWIT.WorkItem[] = [];
     AllLinks: TfsWIT.WorkItemLink[] = [];
-    AllMyPrs: TfsGit.GitPullRequest[] = [];
+    AllPrs: TfsGit.GitPullRequest[] = [];
 
     static LoadingItem: ITreeItem<IWorkItem> = {
         childItems: [],
@@ -77,10 +78,12 @@ export class Data {
 
     private async loadItems(): Promise<ITreeItem<IWorkItem>[]> {
         if (!this.Settings.isReady) return [];
+
+        this.AllPrs = [];
         
         try {
-            let tt = await Promise.all([this.loadWorkItems(), this.loadPullRequests()]);
-            return tt[0].concat(tt[1]);
+            let tt = await Promise.all([this.loadWorkItems(), this.loadPullRequestsCreated(), this.loadPullRequestsAssigned()]);
+            return tt[0].concat(tt[1]).concat(tt[2]);
         }
         catch (e) {
             return [{data: {
@@ -174,14 +177,17 @@ export class Data {
         return result;
     }
     
-    private async loadPullRequests(): Promise<ITreeItem<IWorkItem>[]> {
+    private async loadPullRequests(
+        init: (c: TfsGit.GitPullRequestSearchCriteria) => void,
+        caption: string
+    ): Promise<ITreeItem<IWorkItem>[]> {
 
         const tfs = getClient(TfsGit.GitRestClient);
         const repositoryId = "soneta.git";
         const projectName = "Soneta";
 
-        let prs = await tfs.getPullRequests(repositoryId, {
-            creatorId: this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
+        let criteria: TfsGit.GitPullRequestSearchCriteria = {
+            creatorId: "",
             includeLinks: false,
             repositoryId: repositoryId,
             reviewerId: "", 
@@ -189,55 +195,53 @@ export class Data {
             sourceRepositoryId: "",
             status: TfsGit.PullRequestStatus.Active,
             targetRefName: ""
-        }, projectName);
+        };
+        init(criteria);
+
+        let prs = await tfs.getPullRequests(repositoryId, criteria, projectName);
 
         prs = prs.filter(pr => !pr.isDraft);
+        this.AllPrs = this.AllPrs.concat(prs);
 
         let threads = await Promise.all(prs.map(pr => tfs.getThreads(repositoryId, pr.pullRequestId, projectName)));
-        let nthreads = threads.map(
-            tt => tt.filter(
-                        t => t.status==TfsGit.CommentThreadStatus.Active || t.status==TfsGit.CommentThreadStatus.Pending)
-                    .length);
-        let statuses = nthreads.map((n, idx) => this.calcPrStatus(prs[idx], n));
+        let infos = prs.map((pr, index) => new PrInfo(pr, threads[index]));
 
         if (this.TaskFilter!="All") {
-            for (let i = prs.length; --i>=0;) {
-                let ok = this.TaskFilter=="Done" ? !statuses[i] : !!statuses[i];
-                if (!ok) {
-                    statuses.splice(i, 1);
-                    prs.splice(i, 1);
-                }
-            }
+            if (this.TaskFilter=="Done")
+                infos = infos.filter(info => !info.Active);
+            else
+                infos = infos.filter(info => info.Active);
         }
 
-        if (prs.length==0) return [];
-
-        this.AllMyPrs = prs;
-
-        let items = prs
-                .map((pr, idx) => ({
-                    data: this.getTreePullRequest(pr, statuses[idx]),
+        let items = infos.map(info => ({
+                    data: info.createWorkItem(this),
                     expanded: false
-                }));
+               }));
+
+        if (items.length==0) return [];
 
         return [this.createGroup(
             "pr_my",
-            "Pull Requests created by Me",
+            caption,
             Styles.PrIcon,
             items
         )];
     }
 
-    private calcPrStatus(pr: TfsGit.GitPullRequest, nComments: number): string {
-        if (pr.reviewers.some(r => r.vote<0)) return "Waiting";
-        if (nComments==1) return "Comment";
-        if (nComments>1) return nComments+" comments";
-        if (pr.reviewers.some(r => r.isRequired && r.vote==0)) return "";
-        if (pr.reviewers.some(r => !r.isRequired)) 
-            if (pr.reviewers.every(r => !r.isRequired && r.vote==0)) return "";
-        return "Ready";
+    private loadPullRequestsCreated(): Promise<ITreeItem<IWorkItem>[]> {
+        return this.loadPullRequests(
+            criteria => criteria.creatorId = this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
+            "Pull Requests created by Me"
+        );
     }
-    
+
+    private loadPullRequestsAssigned(): Promise<ITreeItem<IWorkItem>[]> {
+        return this.loadPullRequests(
+            criteria => criteria.reviewerId = this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
+            "Pull Requests assigned to Me"
+        );
+    }
+
     private updateUsers(): void {
         this.UserFilterValues = [];
         for (const wi of this.AllItems) {
@@ -411,80 +415,6 @@ export class Data {
         return result;
     }
 
-    private getTreePullRequest(pr: TfsGit.GitPullRequest, status: string): IWorkItem {
-        let textNode: React.ReactNode = pr.pullRequestId + ": " + pr.title;
-
-        let url = pr.url;
-        url = url.replace("/_apis/git/repositories/", "/_git/");
-        url = url.substring(0, url.indexOf("/pullRequests/"));
-        url = url+"?version=GB";
-
-        let sourceBranch = Data.prepareBranchName(pr.sourceRefName);
-        let targetBranch = Data.prepareBranchName(pr.targetRefName);
-
-        this.LinksInfo[sourceBranch] = {
-            name: sourceBranch,
-            title: sourceBranch,
-            url: url+sourceBranch.replace("/", "%2f")
-        };
-        this.LinksInfo[targetBranch] = {
-            name: targetBranch,
-            title: targetBranch,
-            url: url+targetBranch.replace("/", "%2f")
-        };
-
-        let rels : React.ReactNode[] = [
-            React.createElement(LinkItem, {
-                Data: this, 
-                Link: sourceBranch, 
-                ID: -1, 
-                Icon: Styles.LinkBranchIconName, 
-                key: "pr_source"+pr.pullRequestId
-            }),
-            " ",
-            React.createElement(LinkItem, {
-                Data: this, 
-                Link: targetBranch, 
-                ID: -1, 
-                Icon: Styles.LinkTargetBranchIconName, 
-                key: "pr_target"+pr.pullRequestId
-            })
-        ];
-
-        textNode = React.createElement("div", null,
-            textNode,
-            React.createElement("div", null,
-                React.createElement("small", null, 
-                    rels
-        )));
-
-        let result: IWorkItem = {
-            id: "pr"+pr.pullRequestId,
-            title: { 
-                text: pr.pullRequestId + ": " + pr.title,
-                textNode: textNode,
-                iconProps: Styles.PrIcon
-            },
-            state: {
-                text: status || "Done",
-                iconProps: status ? Styles.PrStateActive : Styles.PrStateCompleted
-            },
-            assignedTo: pr.createdBy.displayName,
-            area: Data.prepareRef(pr.sourceRefName).replace("releases/", ""),
-            priority: 0,
-            release: Data.prepareRef(pr.targetRefName).replace("releases/", "")
-        };
-
-        return result;
-    }
-
-    private static prepareBranchName(name: string) {
-        let t = name.split("/");
-        t.shift();
-        t.shift();
-        return t.join("/");
-    }
-
     async openItem(id: string) {
         if (id.substring(0, 4)=="item") {
             const navSvc = await SDK.getService<TfsWIT.IWorkItemFormNavigationService>(TfsWIT.WorkItemTrackingServiceIds.WorkItemFormNavigationService);
@@ -492,9 +422,9 @@ export class Data {
         }
         else if (id.substring(0, 2)=="pr") {
             let prid = parseInt(id.substring(2));
-            let pr = this.AllMyPrs.first(p => p.pullRequestId==prid);
-            let url = Data.preparePrUrl(pr.url);
-            open(url, "_blank");
+            let pr = this.AllPrs.first(p => p.pullRequestId==prid);
+            let url = PrInfo.preparePrUrl(pr.url);
+            open(url);
         }
     };
 
@@ -545,7 +475,7 @@ export class Data {
 
             let pr = await tfs.getPullRequestById(parseInt(args[2]), args[0]);
 
-            let url = Data.preparePrUrl(pr.url);
+            let url = PrInfo.preparePrUrl(pr.url);
 
             this.LinksInfo[l.type+l.link] = {
                 name: "!"+pr.pullRequestId + (pr.status==3 ? " [C]" : pr.status==2 ? " [D]" : ""),
@@ -605,14 +535,9 @@ export class Data {
         }
     }
 
-    private static prepareRef(s: string): string {
-        return s.startsWith("refs/heads/") ? s.substring(11) : s;
-    }
-
-    private static preparePrUrl(url: string): string {
-        url = url.replace("/_apis/git/repositories/", "/_git/");
-        url = url.replace("/pullRequests/", "/pullrequest/");
-        return url;
+    public static prepareRef(s: string): string {
+        if (s.startsWith("refs/heads/")) s = s.substring(11);
+        return s.replace("releases/", "");
     }
 
 }

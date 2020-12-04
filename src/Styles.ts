@@ -47,4 +47,6 @@ export class Styles {
 
     static PrStateActive: IIconProps = { iconName: "StatusCircleInner", style: { color: "#007acc"} };
     static PrStateCompleted: IIconProps = { iconName: "StatusCircleInner", style: { color: "#339933"} };
+    static PrStateWaiting: IIconProps = { iconName: "StatusCircleInner", style: { color: "#d67f3c"} };
+    static PrStateRejected: IIconProps = { iconName: "StatusCircleInner", style: { color: "#cd4a45"} };
 }
