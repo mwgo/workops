@@ -13,7 +13,7 @@ import { LinkItem } from "./LinkItem";
 import { SettingsData } from "./SettingsData";
 import { ToolsSetup } from "./Tools";
 import { IIconProps } from "azure-devops-ui/Icon";
-import { PrInfo } from "./PrInfo";
+import { PrInfo, PrStatus } from "./PrInfo";
 
 
 export interface IWorkItem extends ISimpleTableCell {
@@ -179,7 +179,8 @@ export class Data {
     
     private async loadPullRequests(
         init: (c: TfsGit.GitPullRequestSearchCriteria) => void,
-        caption: string
+        caption: string,
+        expanded: boolean
     ): Promise<ITreeItem<IWorkItem>[]> {
 
         const tfs = getClient(TfsGit.GitRestClient);
@@ -208,37 +209,44 @@ export class Data {
 
         if (this.TaskFilter!="All") {
             if (this.TaskFilter=="Done")
-                infos = infos.filter(info => !info.Active);
+                infos = infos.filter(info => info.Status==PrStatus.Done);
+            else if (this.TaskFilter=="Current")
+                infos = infos.filter(info => info.Status==PrStatus.Ready);
             else
-                infos = infos.filter(info => info.Active);
+                infos = infos.filter(info => info.Status==PrStatus.Ready || info.Status==PrStatus.New);
         }
+
+        if (infos.length==0) return [];
 
         let items = infos.map(info => ({
                     data: info.createWorkItem(this),
                     expanded: false
                }));
 
-        if (items.length==0) return [];
-
-        return [this.createGroup(
+        let item = this.createGroup(
             "pr_my",
             caption,
             Styles.PrIcon,
             items
-        )];
+        );
+        item.expanded = expanded;
+
+        return [item];
     }
 
     private loadPullRequestsCreated(): Promise<ITreeItem<IWorkItem>[]> {
         return this.loadPullRequests(
             criteria => criteria.creatorId = this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
-            "Pull Requests created by Me"
+            "Pull Requests created by Me",
+            true
         );
     }
 
     private loadPullRequestsAssigned(): Promise<ITreeItem<IWorkItem>[]> {
         return this.loadPullRequests(
             criteria => criteria.reviewerId = this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
-            "Pull Requests assigned to Me"
+            "Pull Requests assigned to Me",
+            false
         );
     }
 

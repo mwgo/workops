@@ -1,40 +1,37 @@
 import React = require("react");
 
-import * as SDK from "azure-devops-extension-sdk";
-import * as TfsWIT from "azure-devops-extension-api/WorkItemTracking";
 import * as TfsGit from "azure-devops-extension-api/Git";
-import { getClient } from "azure-devops-extension-api";
-import { ITreeItem, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemProvider";
-import { ISimpleTableCell } from "azure-devops-ui/Table";
-import { ISimpleListCell } from "azure-devops-ui/List";
 
 import { Styles } from "./Styles";
 import { LinkItem } from "./LinkItem";
-import { SettingsData } from "./SettingsData";
-import { ToolsSetup } from "./Tools";
-import { IIconProps } from "azure-devops-ui/Icon";
 import { Data, IWorkItem } from "./Data";
+
+export enum PrStatus {
+    New,
+    Ready,
+    Done
+}
 
 export class PrInfo {
     readonly PR: TfsGit.GitPullRequest;
-    readonly Status: string;
+    readonly StatusInfo: string;
     readonly NComments: number;
-    readonly Active: boolean;
+    readonly Status: PrStatus;
 
     constructor(pr: TfsGit.GitPullRequest, threads: TfsGit.GitPullRequestCommentThread[]) {
         this.PR = pr;
 
         this.NComments = threads.filter(t => t.status==TfsGit.CommentThreadStatus.Active || t.status==TfsGit.CommentThreadStatus.Pending).length;
         
-        this.Status = "Ready";
-        if (pr.reviewers.some(r => r.vote<0)) this.Status = "Waiting";
-        else if (this.NComments==1) this.Status = "Comment";
-        else if (this.NComments>1) this.Status = this.NComments+" comments";
-        else if (pr.reviewers.some(r => r.isRequired && r.vote==0)) this.Status = "";
+        this.StatusInfo = "Ready";
+        if (pr.reviewers.some(r => r.vote<0)) this.StatusInfo = "Waiting";
+        else if (this.NComments==1) this.StatusInfo = "Comment";
+        else if (this.NComments>1) this.StatusInfo = this.NComments+" comments";
+        else if (pr.reviewers.some(r => r.isRequired && r.vote==0)) this.StatusInfo = "Done";
         else if (pr.reviewers.some(r => !r.isRequired)) 
-            if (pr.reviewers.every(r => !r.isRequired && r.vote==0)) this.Status = "";
+            if (pr.reviewers.every(r => !r.isRequired && r.vote==0)) this.StatusInfo = "Done";
 
-        this.Active = !!this.Status;
+        this.Status = this.StatusInfo=="Done" ? PrStatus.Done : PrStatus.Ready;
     }
 
     createWorkItem(data: Data): IWorkItem {
@@ -84,7 +81,7 @@ export class PrInfo {
                     rels
         )));
 
-        let status = this.Status;
+        let status = this.StatusInfo;
         let statusIcon = status ? Styles.PrStateActive : Styles.PrStateCompleted;
         let refVote = this.PR.reviewers.find(rv => data.Settings.CurrentUser!==undefined && rv.uniqueName==data.Settings.CurrentUser.name);
         if (refVote) {
