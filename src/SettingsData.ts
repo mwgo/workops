@@ -143,6 +143,20 @@ export class SettingsData {
         return true;
     }
 
+    public IsCurrentUser(uniqueName: string): boolean {
+        return this.CurrentUser!==undefined && uniqueName==this.CurrentUser.name;
+    }
+
+    public get CurrentUserId() {
+        return this.CurrentUser ? this.CurrentUser.id : "";
+    }
+
+    public ContainsCurrentUser(comment: string): boolean {
+        if (!this.CurrentUser) return false;
+
+        let s = "@<" + this.CurrentUser.id.toUpperCase() + ">";
+        return comment.toUpperCase().indexOf(s)>=0;
+    }
 }
 
 export interface IIterationItem {

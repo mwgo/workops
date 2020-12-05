@@ -201,11 +201,13 @@ export class Data {
 
         let prs = await tfs.getPullRequests(repositoryId, criteria, projectName);
 
-        prs = prs.filter(pr => !pr.isDraft);
+        if (this.TaskFilter!="All") 
+            prs = prs.filter(pr => !pr.isDraft);
+
         this.AllPrs = this.AllPrs.concat(prs);
 
         let threads = await Promise.all(prs.map(pr => tfs.getThreads(repositoryId, pr.pullRequestId, projectName)));
-        let infos = prs.map((pr, index) => new PrInfo(pr, threads[index]));
+        let infos = prs.map((pr, index) => new PrInfo(this, pr, threads[index]));
 
         if (this.TaskFilter!="All") {
             if (this.TaskFilter=="Done")
@@ -219,7 +221,7 @@ export class Data {
         if (infos.length==0) return [];
 
         let items = infos.map(info => ({
-                    data: info.createWorkItem(this),
+                    data: info.createWorkItem(),
                     expanded: false
                }));
 
@@ -236,7 +238,7 @@ export class Data {
 
     private loadPullRequestsCreated(): Promise<ITreeItem<IWorkItem>[]> {
         return this.loadPullRequests(
-            criteria => criteria.creatorId = this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
+            criteria => criteria.creatorId = this.Settings.CurrentUserId,
             "Pull Requests created by Me",
             true
         );
@@ -244,7 +246,7 @@ export class Data {
 
     private loadPullRequestsAssigned(): Promise<ITreeItem<IWorkItem>[]> {
         return this.loadPullRequests(
-            criteria => criteria.reviewerId = this.Settings.CurrentUser ? this.Settings.CurrentUser.id : "",
+            criteria => criteria.reviewerId = this.Settings.CurrentUserId,
             "Pull Requests assigned to Me",
             false
         );
@@ -366,7 +368,7 @@ export class Data {
         if (!release) release = it.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
 
         let isActive = state=="Active" || state=="Ready";
-        let isMy = assigned && this.Settings.CurrentUser && assigned.uniqueName==this.Settings.CurrentUser.name;
+        let isMy = assigned && this.Settings.IsCurrentUser(assigned.uniqueName);
 
         let n = 0;
         let rels : React.ReactNode[] = this
