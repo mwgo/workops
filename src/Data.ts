@@ -26,6 +26,8 @@ export interface IWorkItem extends ISimpleTableCell {
     // workItem: TfsWIT.WorkItem;
 }
 
+export type TaskFilters = "Active" | "Waiting" | "Done" | "All";
+
 export class Data {
 
     Settings: SettingsData;
@@ -34,8 +36,8 @@ export class Data {
 
     WorkItems: ITreeItem<IWorkItem>[] = [];
 
-    TaskFilter = "Current";
-    static TaskFilterValues = ["Current", "New+Current", "Done", "All"];
+    TaskFilter: TaskFilters = "Active";
+    static TaskFilterValues = ["Active", "Waiting", "Done", "All"];
     UserFilter = "@me";
     UserFilterValues = ["@me"];
 
@@ -113,8 +115,8 @@ export class Data {
             user = "'"+user+"'";
 
         let stateFilter = "'Ready', 'Active'";
-        if (this.TaskFilter=="New+Current")
-            stateFilter = "'New', 'Ready', 'Active'";
+        if (this.TaskFilter=="Waiting")
+            stateFilter = "'New'";
         if (this.TaskFilter=="Done")
             stateFilter = "'Resolved', 'Closed'";
         if (this.TaskFilter=="All")
@@ -129,10 +131,12 @@ export class Data {
         };
 
         stateFilter = "'Ready', 'Active'";
+        if (this.TaskFilter=="Waiting")
+            stateFilter = "'New'";
         if (this.TaskFilter=="Done")
             stateFilter = "'Closed'";
         if (this.TaskFilter=="All")
-            stateFilter = "'Ready', 'Active', 'Closed'";
+            stateFilter = "'New', 'Ready', 'Active', 'Closed'";
 
         let topWiql2 = {
             query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]="+user+
@@ -212,10 +216,10 @@ export class Data {
         if (this.TaskFilter!="All") {
             if (this.TaskFilter=="Done")
                 infos = infos.filter(info => info.Status==PrStatus.Done);
-            else if (this.TaskFilter=="Current")
+            else if (this.TaskFilter=="Active")
                 infos = infos.filter(info => info.Status==PrStatus.Ready);
             else
-                infos = infos.filter(info => info.Status==PrStatus.Ready || info.Status==PrStatus.New);
+                infos = infos.filter(info => info.Status==PrStatus.Waiting);
         }
 
         if (infos.length==0) return [];

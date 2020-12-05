@@ -15,6 +15,7 @@ import { DropdownSelection } from "azure-devops-ui/Utilities/DropdownSelection";
 import {
     IWorkItem,
     Data,
+    TaskFilters
 } from "../Data";
 
 interface ITodoListTabState {
@@ -75,7 +76,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
         if (this.tasksFilter.value.length>0) {
             let tf = this.tasksFilter.value[0].beginIndex;
             if (this.data.TaskFilter!=Data.TaskFilterValues[tf]) {
-                this.data.TaskFilter = Data.TaskFilterValues[tf];
+                this.data.TaskFilter = Data.TaskFilterValues[tf] as TaskFilters;
                 this.updateTaskFilter();
                 changed = true;
             }

@@ -9,7 +9,7 @@ import { CommentType } from "azure-devops-extension-api/Git";
 import { IIconProps } from "azure-devops-ui/Icon";
 
 export enum PrStatus {
-    New,
+    Waiting,
     Ready,
     Done,
     Other
@@ -133,7 +133,7 @@ export class PrInfo {
                     case -5:
                         this.StatusInfo = "Waiting";
                         this.StatusDesc = "Author is requested for action by me";
-                        this.Status = PrStatus.New;
+                        this.Status = PrStatus.Waiting;
                         break;
                     case -10:
                         this.StatusInfo = "Rejected";
@@ -209,7 +209,7 @@ export class PrInfo {
         let statusIcon: IIconProps;
         if (this.IsMy) {
             switch (this.Status) {
-                case PrStatus.New:
+                case PrStatus.Waiting:
                     statusIcon = Styles.PrStateWaiting;
                     break;
                 case PrStatus.Ready:
