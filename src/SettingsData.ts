@@ -157,7 +157,13 @@ export class SettingsData {
         let s = "@<" + this.CurrentUser.id.toUpperCase() + ">";
         return comment.toUpperCase().indexOf(s)>=0;
     }
-}
+
+    public ContainsCurrentUser2(comment: string): boolean {
+        if (!this.CurrentUser) return false;
+
+        let s = ">@" + this.CurrentUser.displayName.toUpperCase() + "<";
+        return comment.toUpperCase().indexOf(s)>=0;
+    }}
 
 export interface IIterationItem {
     id: string;

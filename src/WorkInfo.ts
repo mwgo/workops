@@ -24,11 +24,32 @@ export class WorkInfo {
     readonly Item: TfsWIT.WorkItem;
     readonly Comments?: TfsWIT.WorkItemComments;
 
+    readonly State: string;
+    readonly IsActive: boolean;
+    readonly IsMy: boolean;
+    readonly IsMentioned: boolean;
+
     constructor(data: Data, it: TfsWIT.WorkItem, comments?: TfsWIT.WorkItemComments) {
         this.Data = data;
         this.ID = it.id;
         this.Item = it;
         this.Comments = comments;
+
+        this.State = this.Item.fields["System.State"] as string;
+
+        let assigned = this.Item.fields["System.AssignedTo"];
+        this.IsMy = data.Settings.IsCurrentUser(assigned.uniqueName);
+        this.IsActive = this.State=="Active" || this.State=="Ready";
+        this.IsMentioned = false;
+
+        if (comments) {
+            this.IsMentioned = this.IsMy;
+            for (const comment of comments.comments) {
+                if (data.Settings.ContainsCurrentUser2(comment.text)) this.IsMentioned = true;
+                if (this.IsMy && comment.text.indexOf("data-vss-mention=")<0) this.IsMentioned = true;
+                if (data.Settings.IsCurrentUser(comment.revisedBy.uniqueName)) this.IsMentioned = false;
+            }    
+        }
     }
 
     public static async create(data: Data, client: TfsWIT.WorkItemTrackingRestClient, ids: number[], withComment: boolean=false) {
@@ -90,14 +111,10 @@ export class WorkInfo {
         let typeName = this.Item.fields["System.WorkItemType"] as string;
         let typeIcon = Styles.TypesMap[typeName] || Styles.TypesMap[""];
 
-        let state = this.Item.fields["System.State"] as string;
-        let stateIcon = Styles.StatesMap[state] || Styles.StatesMap[""];
+        let stateIcon = Styles.StatesMap[this.State] || Styles.StatesMap[""];
 
         let release = this.Item.fields["Custom.Release"] as string;
         if (!release) release = this.Item.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
-
-        let isActive = state=="Active" || state=="Ready";
-        let isMy = assigned && this.Data.Settings.IsCurrentUser(assigned.uniqueName);
 
         let n = 0;
         let rels : React.ReactNode[] = this
@@ -111,7 +128,7 @@ export class WorkInfo {
             }));
 
         let textNode: React.ReactNode = this.Item.fields["System.Title"] as string;
-        if (isMy)
+        if (this.IsMy)
             textNode = React.createElement("span", null,
                 React.createElement("span", { className: "currentlist-my-id" },
                     this.ID+": "
@@ -139,10 +156,10 @@ export class WorkInfo {
                 text: this.ID + ": " + this.Item.fields["System.Title"] as string,
                 textNode: textNode,
                 iconProps: typeIcon,
-                textClassName: isActive ? "currentlist-active-text" : ""
+                textClassName: this.IsActive ? "currentlist-active-text" : ""
             },
             state: {
-                text: state,
+                text: this.State,
                 iconProps: stateIcon
             },
             assignedTo: (assigned ? assigned.displayName : "") as string,
@@ -165,10 +182,6 @@ export class WorkInfo {
         scan(this);
 
         return t;
-    }
-            
-    public isMentioned(): boolean {
-        return true;
     }
 }
 
