@@ -12,6 +12,8 @@ export class Styles {
 
     static AreaIcon: IIconProps = { iconName: "StatusCircleInner", style: { color: "#000000"} };
 
+    static MentionedIcon: IIconProps = { iconName: "Comment", style: { color: "#000000"} };
+
     static PrIcon: IIconProps = { iconName: "BranchPullRequest", style: { color: "#000000"} };
 
     static LinkBranchIconName = "BranchFork2";

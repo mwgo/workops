@@ -14,6 +14,7 @@ import { SettingsData } from "./SettingsData";
 import { ToolsSetup } from "./Tools";
 import { IIconProps } from "azure-devops-ui/Icon";
 import { PrInfo, PrStatus } from "./PrInfo";
+import { WorkInfo } from "./WorkInfo";
 
 
 export interface IWorkItem extends ISimpleTableCell {
@@ -41,7 +42,7 @@ export class Data {
     UserFilter = "@me";
     UserFilterValues = ["@me"];
 
-    AllItems: TfsWIT.WorkItem[] = [];
+    AllItems: WorkInfo[] = [];
     AllLinks: TfsWIT.WorkItemLink[] = [];
     AllPrs: TfsGit.GitPullRequest[] = [];
 
@@ -82,10 +83,14 @@ export class Data {
         if (!this.Settings.isReady) return [];
 
         this.AllPrs = [];
+        this.AllItems = [];
         
         try {
-            let tt = await Promise.all([this.loadWorkItems(), this.loadPullRequestsCreated(), this.loadPullRequestsAssigned()]);
-            return tt[0].concat(tt[1]).concat(tt[2]);
+            let tt = await Promise.all([this.loadWorkItems(), this.loadMentions(), this.loadPullRequestsCreated(), this.loadPullRequestsAssigned()]);
+          
+            this.updateUsers();
+            
+            return tt[0].concat(tt[1]).concat(tt[2]).concat(tt[3]);
         }
         catch (e) {
             return [{data: {
@@ -118,9 +123,9 @@ export class Data {
         if (this.TaskFilter=="Waiting")
             stateFilter = "'New'";
         if (this.TaskFilter=="Done")
-            stateFilter = "'Resolved', 'Closed'";
+            stateFilter = "'Resolved'";//, 'Closed'";
         if (this.TaskFilter=="All")
-            stateFilter = "'New', 'Ready', 'Active', 'Resolved', 'Closed', 'Removed'";
+            stateFilter = "'New', 'Ready', 'Active', 'Resolved'"; //, 'Closed', 'Removed'
 
         let topWiql = {
             query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
@@ -134,12 +139,12 @@ export class Data {
         if (this.TaskFilter=="Waiting")
             stateFilter = "'New'";
         if (this.TaskFilter=="Done")
-            stateFilter = "'Closed'";
+            stateFilter = "'ClosedIgnore'"; //'Closed'
         if (this.TaskFilter=="All")
-            stateFilter = "'New', 'Ready', 'Active', 'Closed'";
+            stateFilter = "'New', 'Ready', 'Active'"; //, 'Closed'
 
         let topWiql2 = {
-            query: "SELECT * FROM WorkItems WHERE [System.AssignedTo]="+user+
+            query: "SELECT ID FROM WorkItems WHERE [System.AssignedTo]="+user+
                         " AND [Iteration Path]="+iter+
                         " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
                         " AND [System.State] IN ("+stateFilter+")"
@@ -163,16 +168,13 @@ export class Data {
         this.AllLinks = childrenRels.workItemRelations;
         let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
         
-        this.AllItems = await client.getWorkItems(topItems.concat(childrenItems), this.Settings.CurrentProject.id, 
-            undefined, undefined,
-            TfsWIT.WorkItemExpand.Relations);
-
-        this.updateUsers();
+        let infos = await WorkInfo.create(this, client, topItems.concat(childrenItems));
+        this.AllItems = this.AllItems.concat(infos);
             
-        let stories = this.AllItems.filter(it => it.fields["System.WorkItemType"]!="Task")
+        let stories = infos.filter(it => it.Item.fields["System.WorkItemType"]!="Task")
 
         let areas = stories
-            .map(it => it.fields["System.AreaPath"] as string)
+            .map(it => it.Item.fields["System.AreaPath"] as string)
             .sort();
         areas = areas.filter((item, idx) => areas.indexOf(item)==idx); 
 
@@ -181,6 +183,52 @@ export class Data {
         return result;
     }
     
+    private async loadMentions(): Promise<ITreeItem<IWorkItem>[]> {
+        if (!this.Settings.CurrentUser) return [];
+
+        const client = getClient(TfsWIT.WorkItemTrackingRestClient);
+
+        let iter = "@CurrentIteration";
+        if (this.Settings.CurrentIterationPath)
+            iter = "'"+this.Settings.CurrentIterationPath+"'";
+
+        let wiql = {
+            query: "SELECT * FROM WorkItems WHERE [History] Contains Words '@"+this.Settings.CurrentUser.displayName+"'"+
+                        " AND [Iteration Path]="+iter+
+                        " AND [System.State] IN ('New', 'Ready', 'Active', 'Resolved')"
+        };
+
+        let result = await client.queryByWiql(wiql, this.Settings.CurrentProject.id)
+        if (result.workItems.length==0) return [];
+        
+        let ids = result.workItems.map(it => it.id);
+        let infos = await WorkInfo.create(this, client, ids, true);
+
+        if (infos.length==0) return [];
+
+        this.AllItems = this.AllItems.concat(infos);
+
+        if (this.TaskFilter!="All") {
+            if (this.TaskFilter=="Done")
+                infos = infos.filter(info => !info.IsMentioned);
+            if (this.TaskFilter=="Active")
+                infos = infos.filter(info => info.IsMentioned);
+            if (this.TaskFilter=="Waiting")
+                return [];
+        }
+
+        return [this.createGroup(
+            "mentioned",
+            "Mentioned",
+            Styles.MentionedIcon,
+            infos
+                .map(info => ({
+                    data: info.getTreeItem(),
+                    expanded: false
+                }))
+        )];
+    }
+
     private async loadPullRequests(
         init: (c: TfsGit.GitPullRequestSearchCriteria) => void,
         caption: string,
@@ -189,7 +237,7 @@ export class Data {
 
         const tfs = getClient(TfsGit.GitRestClient);
         const repositoryId = "soneta.git";
-        const projectName = "Soneta";
+        const projectName = this.Settings.CurrentProject.name;
 
         let criteria: TfsGit.GitPullRequestSearchCriteria = {
             creatorId: "",
@@ -259,9 +307,9 @@ export class Data {
     private updateUsers(): void {
         this.UserFilterValues = [];
         for (const wi of this.AllItems) {
-            let s0 = wi.fields["System.AssignedTo"].uniqueName as string;
-            let s1 = wi.fields["System.ChangedBy"].uniqueName as string;
-            let s2 = wi.fields["System.CreatedBy"].uniqueName as string;
+            let s0 = wi.Item.fields["System.AssignedTo"].uniqueName as string;
+            let s1 = wi.Item.fields["System.ChangedBy"].uniqueName as string;
+            let s2 = wi.Item.fields["System.CreatedBy"].uniqueName as string;
 
             if (this.UserFilterValues.indexOf(s0)<0) this.UserFilterValues.push(s0);
             if (this.UserFilterValues.indexOf(s1)<0) this.UserFilterValues.push(s1);
@@ -271,16 +319,16 @@ export class Data {
         this.UserFilterValues.splice(0, 0, "@me");
     }
 
-    private getAreaItem(path: string, items: TfsWIT.WorkItem[]): ITreeItem<IWorkItem> {
+    private getAreaItem(path: string, infos: WorkInfo[]): ITreeItem<IWorkItem> {
         return this.createGroup(
             "area"+path,
             path,
             Styles.AreaIcon,
-            items
-                .filter(it => it.fields["System.AreaPath"]==path)
-                .map(it => ({
-                    childItems: this.getTreeChildren(it),
-                    data: this.getTreeItem(it),
+            infos
+                .filter(info => info.Item.fields["System.AreaPath"]==path)
+                .map(info => ({
+                    childItems: info.getTreeChildren(),
+                    data: info.getTreeItem(),
                     expanded: false
                 }))
         );
@@ -307,128 +355,6 @@ export class Data {
         }
     }
 
-    private getChildrenItems(item: TfsWIT.WorkItem): TfsWIT.WorkItem[] {
-        let result = this.AllLinks
-            .filter(l => l.source && l.target && l.source.id==item.id)
-            .map(l => this.AllItems.first(it => it.id==l.target.id));
-        return result;
-    }
-            
-    private getRecursiveItems(item: TfsWIT.WorkItem): TfsWIT.WorkItem[] {
-        let t = [item];
-
-        let scan = (it: TfsWIT.WorkItem) => {
-            let r = this.getChildrenItems(it);
-            t = t.concat(r);
-            r.forEach(scan);
-        }
-        scan(item);
-
-        return t;
-    }
-            
-    private getTreeChildren(item: TfsWIT.WorkItem): ITreeItem<IWorkItem>[] | undefined {
-        if (item.fields["System.WorkItemType"]=="Task") return undefined;
-
-        let children = this.getChildrenItems(item)
-            .map(it => ({
-                childItems: it ? this.getTreeChildren(it) : [],
-                data: this.getTreeItem(it),
-                expanded: false
-            }));
-
-        return children;
-    }
-
-    private getRelations(it: TfsWIT.WorkItem): { type: string, link: string }[] {
-        let t: { type: string, link: string }[] = [];
-        for (let r of it.relations.filter(r => r.rel=="ArtifactLink")) {
-            t.push({ 
-                type: r.url.indexOf("/PullRequestId/")>=0 ? "pr" 
-                    : r.url.indexOf("/Commit/")>=0 ? "commit" 
-                    : r.url.indexOf("/Ref/")>=0 ? "branch" 
-                    : "",
-                link: r.url
-            });
-            if (r.url.indexOf("/PullRequestId/")>=0) 
-                t.push({ 
-                    type: "prbranch",
-                    link: r.url
-                });
-        }
-        return t;
-    }
-
-    private getTreeItem(it: TfsWIT.WorkItem): IWorkItem {
-        let assigned = it.fields["System.AssignedTo"];
-
-        let typeName = it.fields["System.WorkItemType"] as string;
-        let typeIcon = Styles.TypesMap[typeName] || Styles.TypesMap[""];
-
-        let state = it.fields["System.State"] as string;
-        let stateIcon = Styles.StatesMap[state] || Styles.StatesMap[""];
-
-        let release = it.fields["Custom.Release"] as string;
-        if (!release) release = it.fields["Custom.319d7677-7313-48ce-858e-746a615b8704"] as string;
-
-        let isActive = state=="Active" || state=="Ready";
-        let isMy = assigned && this.Settings.IsCurrentUser(assigned.uniqueName);
-
-        let n = 0;
-        let rels : React.ReactNode[] = this
-            .getRelations(it)
-            .map(r => React.createElement(LinkItem, { 
-                Data: this, 
-                Link: r.type + r.link, 
-                ID: it.id, 
-                Icon: Styles.LinksIcon[r.type], 
-                key: it.id + r.type + (n++)
-            }));
-
-        let textNode: React.ReactNode = it.fields["System.Title"] as string;
-        if (isMy)
-            textNode = React.createElement("span", null,
-                React.createElement("span", { className: "currentlist-my-id" },
-                    it.id+": "
-                ),
-                textNode
-            );
-        else
-            textNode = it.id + ": " + textNode;
-
-        if (rels.length>0) {
-            for (let i = rels.length; --i>0; )
-                rels.splice(i, 0, " ");
-            textNode = React.createElement("div", null,
-                textNode,
-                React.createElement("div", null,
-                    React.createElement("small", null, 
-                        rels
-            )));
-        }
-
-        let result: IWorkItem = {
-            // workItem: it,
-            id: "item"+it.id,
-            title: { 
-                text: it.id + ": " + it.fields["System.Title"] as string,
-                textNode: textNode,
-                iconProps: typeIcon,
-                textClassName: isActive ? "currentlist-active-text" : ""
-            },
-            state: {
-                text: state,
-                iconProps: stateIcon
-            },
-            assignedTo: (assigned ? assigned.displayName : "") as string,
-            area: it.fields["System.AreaPath"] as string,
-            priority: it.fields["Microsoft.VSTS.Common.Priority"] as number,
-            release: release
-        };
-
-        return result;
-    }
-
     async openItem(id: string) {
         if (id.substring(0, 4)=="item") {
             const navSvc = await SDK.getService<TfsWIT.IWorkItemFormNavigationService>(TfsWIT.WorkItemTrackingServiceIds.WorkItemFormNavigationService);
@@ -452,21 +378,21 @@ export class Data {
     toggle(item: ITreeItem<IWorkItem>): void {
         if (item.data.id.substring(0, 4)=="item") {
             let id = parseInt(item.data.id.substring(4));
-            let witem = this.AllItems.find(it => it.id==id);
+            let witem = this.AllItems.find(info => info.ID==id);
             if (!witem) return;
 
-            this.retrieveLinks(this.getRecursiveItems(witem));
+            this.retrieveLinks(witem.getRecursiveItems());
         }
 
         this.WorkItemsProvider.toggle(item);
     }
 
-    private async retrieveLinks(items: TfsWIT.WorkItem[]) {
+    private async retrieveLinks(items: WorkInfo[]) {
         const tfs = getClient(TfsGit.GitRestClient);
 
         let changed = false;
         for (const i of items) {
-            for (const l of this.getRelations(i)) {
+            for (const l of i.getRelations()) {
                 if (!this.LinksInfo[l.link]) {
                     await this.retrieveLink(tfs, l);
                     changed = true;

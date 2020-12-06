@@ -1,5 +1,4 @@
 import { Button } from "azure-devops-ui/Button";
-import { ListSelection } from "azure-devops-ui/List";
 import "es6-promise/auto";
 import * as React from "react";
 import { Data } from "./Data";
