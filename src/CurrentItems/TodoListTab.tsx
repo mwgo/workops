@@ -142,7 +142,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
 
                     <KeywordFilterBarItem filterItemKey="Placeholder" />
 
-                    {/* <DropdownFilterBarItem
+                    <DropdownFilterBarItem
                         filterItemKey="userFilter"
                         filter={this.filter}
                         items={this.data.UserFilterValues}
@@ -150,7 +150,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                         placeholder="User"
                         showPlaceholderAsLabel={false}
                         hideClearAction={true}
-                    /> */}
+                    />
 
                     <DropdownFilterBarItem
                         filterItemKey="tasksFilter"
