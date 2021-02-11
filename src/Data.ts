@@ -307,9 +307,9 @@ export class Data {
     private updateUsers(): void {
         this.UserFilterValues = [];
         for (const wi of this.AllItems) {
-            let s0 = wi.Item.fields["System.AssignedTo"].uniqueName as string;
-            let s1 = wi.Item.fields["System.ChangedBy"].uniqueName as string;
-            let s2 = wi.Item.fields["System.CreatedBy"].uniqueName as string;
+            let s0 = Data.getUniqueName(wi, "System.AssignedTo");
+            let s1 = Data.getUniqueName(wi, "System.ChangedBy");
+            let s2 = Data.getUniqueName(wi, "System.CreatedBy");
 
             if (this.UserFilterValues.indexOf(s0)<0) this.UserFilterValues.push(s0);
             if (this.UserFilterValues.indexOf(s1)<0) this.UserFilterValues.push(s1);
@@ -317,6 +317,11 @@ export class Data {
         }
         this.UserFilterValues.sort();
         this.UserFilterValues.splice(0, 0, "@me");
+    }
+
+    private static getUniqueName(wi: WorkInfo, prop: string): string {
+        const v = wi.Item.fields["System.AssignedTo"];
+        return v ? v.uniqueName as string : "";
     }
 
     private getAreaItem(path: string, infos: WorkInfo[]): ITreeItem<IWorkItem> {

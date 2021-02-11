@@ -38,7 +38,7 @@ export class WorkInfo {
         this.State = this.Item.fields["System.State"] as string;
 
         let assigned = this.Item.fields["System.AssignedTo"];
-        this.IsMy = data.Settings.IsCurrentUser(assigned.uniqueName);
+        this.IsMy = data.Settings.IsCurrentUserRef(assigned);
         this.IsActive = this.State=="Active" || this.State=="Ready";
         this.IsMentioned = false;
 
@@ -47,7 +47,7 @@ export class WorkInfo {
             for (const comment of comments.comments) {
                 if (data.Settings.ContainsCurrentUser2(comment.text)) this.IsMentioned = true;
                 if (this.IsMy && comment.text.indexOf("data-vss-mention=")<0) this.IsMentioned = true;
-                if (data.Settings.IsCurrentUser(comment.revisedBy.uniqueName)) this.IsMentioned = false;
+                if (data.Settings.IsCurrentUserRef(comment.revisedBy)) this.IsMentioned = false;
             }    
         }
     }

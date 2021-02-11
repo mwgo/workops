@@ -27,7 +27,7 @@ export class PrInfo {
     constructor(data: Data, pr: TfsGit.GitPullRequest, threads: TfsGit.GitPullRequestCommentThread[]) {
         this.Data = data;
         this.PR = pr;
-        this.IsMy = data.Settings.IsCurrentUser(pr.createdBy.uniqueName);
+        this.IsMy = data.Settings.IsCurrentUserRef(pr.createdBy);
 
         threads = threads.filter(t => t.status==TfsGit.CommentThreadStatus.Active || t.status==TfsGit.CommentThreadStatus.Pending);
 
@@ -42,7 +42,7 @@ export class PrInfo {
                 for (const comment of comments) {
                     if (data.Settings.ContainsCurrentUser(comment.content)) active = true;
                     if (this.IsMy && comment.content.indexOf("@<")<0) active = true;
-                    if (data.Settings.IsCurrentUser(comment.author.uniqueName)) active = false;
+                    if (data.Settings.IsCurrentUserRef(comment.author)) active = false;
                 }
 
                 if (active) ++nactives;
@@ -52,7 +52,7 @@ export class PrInfo {
         let reviewWaiting = pr.reviewers.some(r => r.isRequired && r.vote==0)
             || pr.reviewers.some(r => !r.isRequired) && pr.reviewers.every(r => !r.isRequired && r.vote==0);
         
-        let myReview = pr.reviewers.find(rv => this.Data.Settings.IsCurrentUser(rv.uniqueName));
+        let myReview = pr.reviewers.find(rv => this.Data.Settings.IsCurrentUserRef(rv));
         this.Vote = myReview ? myReview.vote : 10;
 
         if (pr.isDraft) {

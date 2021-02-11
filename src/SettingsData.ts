@@ -147,6 +147,10 @@ export class SettingsData {
         return this.CurrentUser!==undefined && uniqueName==this.CurrentUser.name;
     }
 
+    public IsCurrentUserRef(identify: any): boolean {
+        return identify && identify.uniqueName && this.IsCurrentUser(identify.uniqueUser);
+    }
+
     public get CurrentUserId() {
         return this.CurrentUser ? this.CurrentUser.id : "";
     }
