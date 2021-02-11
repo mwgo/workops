@@ -51,7 +51,12 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
 
         this.props.data.OnRefreshing = () => {
             this.updateIterationIndex();
-            this.setState({ version: this.state.version+1 })
+            this.setState({ version: this.state.version+1 });
+        };
+
+        this.props.data.OnUsersChanged = () => {
+            // this.updateUserFilter();
+            // this.setState({ version: this.state.version+1 });
         };
 
         await this.data.refresh();
@@ -142,7 +147,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
 
                     <KeywordFilterBarItem filterItemKey="Placeholder" />
 
-                    <DropdownFilterBarItem
+                    {/* <DropdownFilterBarItem
                         filterItemKey="userFilter"
                         filter={this.filter}
                         items={this.data.UserFilterValues}
@@ -150,7 +155,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                         placeholder="User"
                         showPlaceholderAsLabel={false}
                         hideClearAction={true}
-                    />
+                    /> */}
 
                     <DropdownFilterBarItem
                         filterItemKey="tasksFilter"

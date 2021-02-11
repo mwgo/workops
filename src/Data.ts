@@ -34,6 +34,7 @@ export class Data {
     Settings: SettingsData;
 
     OnRefreshing?: () => void;
+    OnUsersChanged?: () => void;
 
     WorkItems: ITreeItem<IWorkItem>[] = [];
 
@@ -305,7 +306,8 @@ export class Data {
     }
 
     private updateUsers(): void {
-        this.UserFilterValues = [];
+        const xxx = this.UserFilterValues;
+        this.UserFilterValues.splice(0, this.UserFilterValues.length);
         for (const wi of this.AllItems) {
             let s0 = Data.getUniqueName(wi, "System.AssignedTo");
             let s1 = Data.getUniqueName(wi, "System.ChangedBy");
@@ -317,6 +319,8 @@ export class Data {
         }
         this.UserFilterValues.sort();
         this.UserFilterValues.splice(0, 0, "@me");
+  
+        if (this.OnUsersChanged) this.OnUsersChanged();
     }
 
     private static getUniqueName(wi: WorkInfo, prop: string): string {
