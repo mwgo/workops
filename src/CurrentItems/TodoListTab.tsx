@@ -66,7 +66,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
         this.updateUserFilter();
     }
 
-    private async filterChanged() {
+    private filterChanged() {
         let changed = false;
 
         if (this.iterationList.value.length>0) {
@@ -89,8 +89,8 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
 
         if (this.userFilter.value.length>0) {
             let uf = this.userFilter.value[0].beginIndex;
-            if (this.data.UserFilter!=this.data.UserFilterValues[uf]) {
-                this.data.UserFilter = this.data.UserFilterValues[uf];
+            if (this.data.UserFilter!=this.data.Settings.UserNames[uf].email) {
+                this.data.UserFilter = this.data.Settings.UserNames[uf].email;
                 this.updateUserFilter();
                 changed = true;
             }
@@ -110,7 +110,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
     }
 
     private updateUserFilter(): void {
-        let idx = this.data.UserFilterValues.findIndex(it => it==this.data.UserFilter);
+        let idx = this.data.Settings.UserNames.findIndex(it => it.email==this.data.UserFilter);
         if (idx>=0) this.userFilter.select(idx);
     }
 
@@ -147,15 +147,17 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
 
                     <KeywordFilterBarItem filterItemKey="Placeholder" />
 
-                    {/* <DropdownFilterBarItem
+                    <DropdownFilterBarItem
                         filterItemKey="userFilter"
                         filter={this.filter}
-                        items={this.data.UserFilterValues}
+                        showFilterBox={true}
+                        filterByText={true}
+                        items={this.data.Settings.UserNames.map(u => u.name)}
                         selection={this.userFilter}
                         placeholder="User"
                         showPlaceholderAsLabel={false}
                         hideClearAction={true}
-                    /> */}
+                    />
 
                     <DropdownFilterBarItem
                         filterItemKey="tasksFilter"

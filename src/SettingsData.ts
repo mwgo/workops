@@ -7,11 +7,12 @@ import {
     getClient,
     CommonServiceIds, 
     IProjectInfo,
-    IProjectPageService
+    IProjectPageService,
 } from "azure-devops-extension-api";
 import * as TfsWork from "azure-devops-extension-api/Work";
 import * as TfsCore from "azure-devops-extension-api/Core";
 import * as TfsClient from "azure-devops-extension-api/Work/WorkClient";
+import * as TfsIdents from "azure-devops-extension-api/Identities";
 
 import { IListBoxItem } from "azure-devops-ui/ListBox";
 import { Data } from "./Data";
@@ -20,6 +21,12 @@ import { Data } from "./Data";
 //
 //
 
+interface IUser {
+    name: string;
+    email: string;
+    id: string;
+}
+
 export class SettingsData {
 
     private static version = 1;
@@ -27,10 +34,13 @@ export class SettingsData {
     private currentVersion = SettingsData.version;
 
     CurrentProject: IProjectInfo = { id: "", name: "" };
+    Me?: IUserContext;
     CurrentUser?: IUserContext;
     CurrentIterationPath = "";
 
     Iterations: IListBoxItem<IIterationItem>[] = [];
+
+    UserNames: IUser[] = [];
 
     static create(data: Data) {
         let json = localStorage.getItem("workops_settings");
@@ -68,9 +78,10 @@ export class SettingsData {
         let p = await navService.getProject();
         if (p)
             this.CurrentProject = p;
-        this.CurrentUser = getUser();
+        this.CurrentUser = this.Me = getUser();
 
         await this.retrieveIterations();
+        await this.retrieveIdentities();
     }
 
     private async retrieveIterations() {
@@ -116,6 +127,23 @@ export class SettingsData {
                 iconProps: { iconName: "Sprint" }
             }); 
         }
+    }
+
+    private async retrieveIdentities() {
+        if (!this.CurrentProject) return [];
+
+        const service = await getService<TfsIdents.IVssIdentityService>(TfsIdents.IdentityServiceIds.IdentityService);
+
+        const idents = await service.getIdentityMruAsync();
+
+        this.UserNames = idents
+            .filter(id => (<any>id).samAccountName)
+            .map(id => <IUser>{
+                email: (<any>id).samAccountName, 
+                id: (<any>id).localId, 
+                name: (<any>id).displayName
+            });
+        this.UserNames.splice(0, 0, {name: "@me", email: '@me', id: this.Me ? this.Me.id : ""});
     }
 
     private static isCurrentIteration(iter: TfsWork.TeamSettingsIteration): boolean {
@@ -167,7 +195,18 @@ export class SettingsData {
 
         let s = ">@" + this.CurrentUser.displayName.toUpperCase() + "<";
         return comment.toUpperCase().indexOf(s)>=0;
-    }}
+    }
+
+    public findUserId(userFilter: string) {
+        const users = this.UserNames.filter(u => u.email===userFilter);
+        return users.length>0 ? users[0].id : "";
+    }
+
+    public findUserName(userFilter: string) {
+        const users = this.UserNames.filter(u => u.email===userFilter);
+        return users.length>0 ? users[0].name : "";
+    }
+}
 
 export interface IIterationItem {
     id: string;

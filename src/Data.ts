@@ -41,7 +41,6 @@ export class Data {
     TaskFilter: TaskFilters = "Active";
     static TaskFilterValues = ["Active", "Waiting", "Done", "All"];
     UserFilter = "@me";
-    UserFilterValues = ["@me"];
 
     AllItems: WorkInfo[] = [];
     AllLinks: TfsWIT.WorkItemLink[] = [];
@@ -89,8 +88,6 @@ export class Data {
         try {
             let tt = await Promise.all([this.loadWorkItems(), this.loadMentions(), this.loadPullRequestsCreated(), this.loadPullRequestsAssigned()]);
           
-            this.updateUsers();
-            
             return tt[0].concat(tt[1]).concat(tt[2]).concat(tt[3]);
         }
         catch (e) {
@@ -117,7 +114,7 @@ export class Data {
         if (this.Settings.CurrentIterationPath)
             iter = "'"+this.Settings.CurrentIterationPath+"'";
         let user = this.UserFilter;
-        if (user.substring(0, 1)!="@")
+        if (user===undefined || user.substring(0, 1)!="@")
             user = "'"+user+"'";
 
         let stateFilter = "'Ready', 'Active'";
@@ -193,8 +190,11 @@ export class Data {
         if (this.Settings.CurrentIterationPath)
             iter = "'"+this.Settings.CurrentIterationPath+"'";
 
+        let name = this.Settings.findUserName(this.UserFilter);
+        if (name==="@me") name = this.Settings.CurrentUser.displayName;
+
         let wiql = {
-            query: "SELECT * FROM WorkItems WHERE [History] Contains Words '@"+this.Settings.CurrentUser.displayName+"'"+
+            query: "SELECT * FROM WorkItems WHERE [History] Contains Words '@"+name+"'"+
                         " AND [Iteration Path]="+iter+
                         " AND [System.State] IN ('New', 'Ready', 'Active', 'Resolved')"
         };
@@ -290,37 +290,21 @@ export class Data {
     }
 
     private loadPullRequestsCreated(): Promise<ITreeItem<IWorkItem>[]> {
+        const id = this.Settings.findUserId(this.UserFilter);
         return this.loadPullRequests(
-            criteria => criteria.creatorId = this.Settings.CurrentUserId,
-            "Pull Requests created by Me",
+            criteria => criteria.creatorId = id,
+            "Pull Requests created by "+this.Settings.findUserName(this.UserFilter),
             true
         );
     }
 
     private loadPullRequestsAssigned(): Promise<ITreeItem<IWorkItem>[]> {
+        const id = this.Settings.findUserId(this.UserFilter);
         return this.loadPullRequests(
-            criteria => criteria.reviewerId = this.Settings.CurrentUserId,
-            "Pull Requests assigned to Me",
+            criteria => criteria.reviewerId = id,
+            "Pull Requests assigned to "+this.Settings.findUserName(this.UserFilter),
             false
         );
-    }
-
-    private updateUsers(): void {
-        const xxx = this.UserFilterValues;
-        this.UserFilterValues.splice(0, this.UserFilterValues.length);
-        for (const wi of this.AllItems) {
-            let s0 = Data.getUniqueName(wi, "System.AssignedTo");
-            let s1 = Data.getUniqueName(wi, "System.ChangedBy");
-            let s2 = Data.getUniqueName(wi, "System.CreatedBy");
-
-            if (this.UserFilterValues.indexOf(s0)<0) this.UserFilterValues.push(s0);
-            if (this.UserFilterValues.indexOf(s1)<0) this.UserFilterValues.push(s1);
-            if (this.UserFilterValues.indexOf(s2)<0) this.UserFilterValues.push(s2);
-        }
-        this.UserFilterValues.sort();
-        this.UserFilterValues.splice(0, 0, "@me");
-  
-        if (this.OnUsersChanged) this.OnUsersChanged();
     }
 
     private static getUniqueName(wi: WorkInfo, prop: string): string {
