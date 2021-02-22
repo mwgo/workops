@@ -164,7 +164,10 @@ export class WorkInfo {
                 textClassName: this.IsActive ? "" : "currentlist-nonactive-text",
                 iconProps: stateIcon
             },
-            assignedTo: (assigned ? assigned.displayName : "") as string,
+            assignedTo: {
+                text: (assigned ? assigned.displayName : "") as string,
+                textClassName: this.IsMy ? "currentlist-my-id" : ""
+            },
             area: this.Item.fields["System.AreaPath"] as string,
             priority: this.Item.fields["Microsoft.VSTS.Common.Priority"] as number,
             release: release

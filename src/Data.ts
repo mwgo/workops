@@ -21,7 +21,7 @@ export interface IWorkItem extends ISimpleTableCell {
     id: string;
     title: ISimpleListCell;
     state: ISimpleListCell;
-    assignedTo: string;
+    assignedTo: ISimpleListCell;
     area: string;
     priority: number;
     // workItem: TfsWIT.WorkItem;
@@ -57,7 +57,9 @@ export class Data {
             state: {
                 text: ""
             },
-            assignedTo: "",
+            assignedTo: { 
+                text: "" 
+            },
             area: "",
             priority: 0
         },
@@ -100,7 +102,9 @@ export class Data {
                 state: {
                     text: ""
                 },
-                assignedTo: "",
+                assignedTo: { 
+                    text: "" 
+                },
                 area: "",
                 priority: 0
             }}];
@@ -129,7 +133,7 @@ export class Data {
             query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child'"+
                         " AND [Target].[System.AssignedTo]="+user+
                         " AND [Target].[Iteration Path]="+iter+
-                        " AND [Target].[System.WorkItemType]='Task'"+
+                        // " AND [Target].[System.WorkItemType]='Task'"+
                         " AND [Target].[System.State] IN ("+stateFilter+")"
         };
 
@@ -144,7 +148,7 @@ export class Data {
         let topWiql2 = {
             query: "SELECT ID FROM WorkItems WHERE [System.AssignedTo]="+user+
                         " AND [Iteration Path]="+iter+
-                        " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment')"+
+                        // " AND [System.WorkItemType] IN ('Bug', 'User Story', 'Impediment', 'Feature')"+
                         " AND [System.State] IN ("+stateFilter+")"
         };
 
@@ -350,7 +354,9 @@ export class Data {
                 state: {
                     text: ""
                 },
-                assignedTo: "",
+                assignedTo: {
+                    text: ""
+                },
                 area: "",
                 priority: 0
             },

@@ -257,7 +257,9 @@ export class PrInfo {
                 text: this.StatusInfo,
                 iconProps: statusIcon
             },
-            assignedTo: this.PR.createdBy.displayName,
+            assignedTo: {
+                text: this.PR.createdBy.displayName
+            },
             area: Data.prepareRef(this.PR.sourceRefName),
             priority: 0,
             release: Data.prepareRef(this.PR.targetRefName)
