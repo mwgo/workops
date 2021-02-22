@@ -83,6 +83,7 @@ export class WorkInfo {
         let result = this.Data.AllLinks
             .filter(l => l.source && l.target && l.source.id==this.ID)
             .map(l => this.Data.AllItems.first(info => info.ID==l.target.id));
+        Data.sortItems(result);
         return result;
     }
             
@@ -156,10 +157,11 @@ export class WorkInfo {
                 text: this.ID + ": " + this.Item.fields["System.Title"] as string,
                 textNode: textNode,
                 iconProps: typeIcon,
-                textClassName: this.IsActive ? "currentlist-active-text" : ""
+                textClassName: this.IsActive ? "" : "currentlist-nonactive-text" 
             },
             state: {
                 text: this.State,
+                textClassName: this.IsActive ? "" : "currentlist-nonactive-text",
                 iconProps: stateIcon
             },
             assignedTo: (assigned ? assigned.displayName : "") as string,

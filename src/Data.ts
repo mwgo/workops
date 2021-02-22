@@ -11,7 +11,7 @@ import { ISimpleListCell } from "azure-devops-ui/List";
 import { Styles } from "./Styles";
 import { LinkItem } from "./LinkItem";
 import { SettingsData } from "./SettingsData";
-import { ToolsSetup } from "./Tools";
+import { Tools, ToolsSetup } from "./Tools";
 import { IIconProps } from "azure-devops-ui/Icon";
 import { PrInfo, PrStatus } from "./PrInfo";
 import { WorkInfo } from "./WorkInfo";
@@ -169,7 +169,11 @@ export class Data {
         let infos = await WorkInfo.create(this, client, topItems.concat(childrenItems));
         this.AllItems = this.AllItems.concat(infos);
             
-        let stories = infos.filter(it => it.Item.fields["System.WorkItemType"]!="Task")
+        let stories = infos.filter(
+            it => this.AllLinks.filter(
+                l => l.target.id===it.ID && this.AllItems.filter(a => l.source && a.ID===l.source.id).length!==0).length===0)
+
+        Data.sortItems(stories);
 
         let areas = stories
             .map(it => it.Item.fields["System.AreaPath"] as string)
@@ -179,6 +183,10 @@ export class Data {
         let result = areas.map(a => this.getAreaItem(a, stories));
 
         return result;
+    }
+
+    public static sortItems(items: WorkInfo[]) {
+        items.sort((it1, it2) => it1.State!==it2.State ? Tools.StateIndex(it1.State)-Tools.StateIndex(it2.State) : it1.ID-it2.ID);
     }
     
     private async loadMentions(): Promise<ITreeItem<IWorkItem>[]> {
@@ -206,6 +214,8 @@ export class Data {
         let infos = await WorkInfo.create(this, client, ids, true);
 
         if (infos.length==0) return [];
+
+        Data.sortItems(infos);
 
         this.AllItems = this.AllItems.concat(infos);
 

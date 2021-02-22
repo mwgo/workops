@@ -176,7 +176,7 @@ export class SettingsData {
     }
 
     public IsCurrentUserRef(identify: any): boolean {
-        return identify && identify.uniqueName && this.IsCurrentUser(identify.uniqueUser);
+        return identify && identify.uniqueName && this.IsCurrentUser(identify.uniqueName);
     }
 
     public get CurrentUserId() {
@@ -204,7 +204,7 @@ export class SettingsData {
 
     public findUserName(userFilter: string) {
         const users = this.UserNames.filter(u => u.email===userFilter);
-        return users.length>0 ? users[0].name : "";
+        return users.length>0 ? users[0].name : userFilter;
     }
 }
 
