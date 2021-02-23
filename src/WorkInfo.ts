@@ -89,19 +89,21 @@ export class WorkInfo {
             
     public getRelations(): { type: string, link: string }[] {
         let t: { type: string, link: string }[] = [];
-        for (let r of this.Item.relations.filter(r => r.rel=="ArtifactLink")) {
-            t.push({ 
-                type: r.url.indexOf("/PullRequestId/")>=0 ? "pr" 
-                    : r.url.indexOf("/Commit/")>=0 ? "commit" 
-                    : r.url.indexOf("/Ref/")>=0 ? "branch" 
-                    : "",
-                link: r.url
-            });
-            if (r.url.indexOf("/PullRequestId/")>=0) 
+        if (this.Item.relations) {
+            for (let r of this.Item.relations.filter(r => r.rel=="ArtifactLink")) {
                 t.push({ 
-                    type: "prbranch",
+                    type: r.url.indexOf("/PullRequestId/")>=0 ? "pr" 
+                        : r.url.indexOf("/Commit/")>=0 ? "commit" 
+                        : r.url.indexOf("/Ref/")>=0 ? "branch" 
+                        : "",
                     link: r.url
                 });
+                if (r.url.indexOf("/PullRequestId/")>=0) 
+                    t.push({ 
+                        type: "prbranch",
+                        link: r.url
+                    });
+            }
         }
         return t;
     }
@@ -150,6 +152,8 @@ export class WorkInfo {
             )));
         }
 
+        const activeClass = this.IsActive ? "" : "currentlist-nonactive-text";
+
         let result: IWorkItem = {
             // workItem: it,
             id: "item"+this.ID,
@@ -157,16 +161,16 @@ export class WorkInfo {
                 text: this.ID + ": " + this.Item.fields["System.Title"] as string,
                 textNode: textNode,
                 iconProps: typeIcon,
-                textClassName: this.IsActive ? "" : "currentlist-nonactive-text" 
+                textClassName: activeClass
             },
             state: {
                 text: this.State,
-                textClassName: this.IsActive ? "" : "currentlist-nonactive-text",
+                textClassName: activeClass,
                 iconProps: stateIcon
             },
             assignedTo: {
                 text: (assigned ? assigned.displayName : "") as string,
-                textClassName: this.IsMy ? "currentlist-my-id" : ""
+                textClassName: this.IsMy ? "currentlist-my-id "+activeClass : activeClass
             },
             area: this.Item.fields["System.AreaPath"] as string,
             priority: this.Item.fields["Microsoft.VSTS.Common.Priority"] as number,

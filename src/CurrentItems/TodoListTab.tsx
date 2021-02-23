@@ -88,9 +88,22 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
         }
 
         if (this.userFilter.value.length>0) {
-            let uf = this.userFilter.value[0].beginIndex;
-            if (this.data.UserFilter!=this.data.Settings.UserNames[uf].email) {
-                this.data.UserFilter = this.data.Settings.UserNames[uf].email;
+            const uf = this.userFilter.value[0].beginIndex;
+            const u = this.data.Settings.UserNames[uf];
+            if (this.data.UserFilter!=u.email) {
+                this.data.UserFilter = u.email;
+                if (this.data.UserFilter==="@me") {
+                    this.data.Settings.CurrentUser = this.data.Settings.Me;
+                }
+                else {
+                    this.data.Settings.CurrentUser = {
+                        name: u.email,
+                        id: u.id,
+                        displayName: u.name,
+                        descriptor: "",
+                        imageUrl: ""
+                    };
+                }
                 this.updateUserFilter();
                 changed = true;
             }
