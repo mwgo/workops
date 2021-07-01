@@ -3,6 +3,7 @@ import * as React from "react";
 declare global {
     interface Array<T> {
         first(predicate: (value: T, index: number, obj: T[]) => any): T;
+        firstOrUndefined(predicate: (value: T, index: number, obj: T[]) => any): T;
     }  
 }
 
@@ -33,3 +34,10 @@ if (!Array.prototype.first) {
     };
 }
 
+if (!Array.prototype.firstOrUndefined) {
+    Array.prototype.firstOrUndefined = function<T>(predicate: (value: T, index: number, obj: T[]) => any) {
+        let idx = this.findIndex(predicate);
+        if (idx<0) return undefined;
+        return this[idx];
+    };
+}

@@ -82,7 +82,8 @@ export class WorkInfo {
     public getChildrenItems(): WorkInfo[] {
         let result = this.Data.AllLinks
             .filter(l => l.source && l.target && l.source.id==this.ID)
-            .map(l => this.Data.AllItems.first(info => info.ID==l.target.id));
+            .map(l => this.Data.AllItems.firstOrUndefined(info => info.ID==l.target.id))
+            .filter(l => l!==undefined);
         Data.sortItems(result);
         return result;
     }

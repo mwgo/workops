@@ -170,7 +170,10 @@ export class Data {
         this.AllLinks = childrenRels.workItemRelations;
         let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
         
-        let infos = await WorkInfo.create(this, client, topItems.concat(childrenItems));
+        let ids = topItems.concat(childrenItems);
+        if (ids.length>200) ids = ids.splice(0, 200);
+
+        let infos = await WorkInfo.create(this, client, ids);
         this.AllItems = this.AllItems.concat(infos);
             
         let stories = infos.filter(
