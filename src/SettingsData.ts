@@ -93,6 +93,8 @@ export class SettingsData {
         let projectId = this.CurrentProject.id;
 
         let teams = await coreClient.getTeams(this.CurrentProject.id, true, 50);
+        if (teams.length==0)
+            teams = await coreClient.getTeams(this.CurrentProject.id, false, 100);
 
         let titerations = await Promise.all(teams.map(team => {
             let teamContext: TfsCore.TeamContext = { projectId: projectId, teamId: team.id, project: "", team: "" };
@@ -105,10 +107,11 @@ export class SettingsData {
         for (const tit of titerations) {
             for (const it of tit) {
                 if (!it.attributes.finishDate || it.attributes.finishDate.getTime()>time) 
-                    if (iterations.findIndex(i => it.id==i.id)<=0)
+                    if (iterations.findIndex(i => it.id==i.id)<0)
                         iterations.push(it);
             }
         }
+        iterations.sort((a, b) => SettingsData.startTime(a) - SettingsData.startTime(b));
 
         let iterIdx = iterations.findIndex(i => SettingsData.isCurrentIteration(i));
         if (iterIdx<0) iterIdx = iterations.findIndex(i => SettingsData.isCurrentIteration2(i));
@@ -144,6 +147,10 @@ export class SettingsData {
                 name: (<any>id).displayName
             });
         this.UserNames.splice(0, 0, {name: "@me", email: '@me', id: this.Me ? this.Me.id : ""});
+    }
+
+    private static startTime(iter: TfsWork.TeamSettingsIteration): number {
+        return iter.attributes.startDate ? iter.attributes.startDate.getTime() : Number.MAX_VALUE;
     }
 
     private static isCurrentIteration(iter: TfsWork.TeamSettingsIteration): boolean {
