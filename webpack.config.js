@@ -16,7 +16,8 @@ fs.readdirSync(samplesDir).filter(dir => {
 module.exports = {
     entry: entries,
     output: {
-        filename: "[name]/[name].js"
+        filename: "[name]/[name].js",
+        clean: true
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js"],
@@ -27,6 +28,9 @@ module.exports = {
     stats: {
         warnings: false
     },
+    performance: {
+        hints: false
+    },
     module: {
         rules: [
             {
@@ -35,25 +39,19 @@ module.exports = {
             },
             {
                 test: /\.scss$/,
-                use: ["style-loader", "css-loader", "azure-devops-ui/buildScripts/css-variables-loader", { loader: "sass-loader", options: { implementation: require("sass") } }]
+                use: ["style-loader", "css-loader", "sass-loader"]
             },
             {
                 test: /\.css$/,
                 use: ["style-loader", "css-loader"],
             },
             {
-                test: /\.woff$/,
-                use: [{
-                    loader: 'base64-inline-loader'
-                }]
-            },
-            {
-                test: /\.html$/,
-                loader: "file-loader"
+                test: /\.woff2?$/,
+                type: "asset/inline"
             }
         ]
     },
     plugins: [
-        new CopyWebpackPlugin([ { from: "**/*.html", context: "src" }])
+        new CopyWebpackPlugin({ patterns: [ { from: "**/*.html", context: "src" } ] })
     ]
 };

@@ -96,7 +96,7 @@ export class Data {
             return [{data: {
                 id: "error",
                 title: { 
-                    text: e.toString(),
+                    text: String(e),
                     iconProps: Styles.ErrorIcon
                 },
                 state: {

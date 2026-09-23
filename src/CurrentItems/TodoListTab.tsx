@@ -2,7 +2,7 @@ import * as React from "react";
 import * as SDK from "azure-devops-extension-sdk";
 
 import { Card } from "azure-devops-ui/Card";
-import { Tree } from "azure-devops-ui/TreeEx";
+import { ITreeProps, Tree } from "azure-devops-ui/TreeEx";
 import { renderExpandableTreeCell, renderTreeCell } from "azure-devops-ui/TreeEx";
 
 import { FilterBar } from "azure-devops-ui/FilterBar";
@@ -168,7 +168,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                         items={this.data.Settings.UserNames.map(u => u.name)}
                         selection={this.userFilter}
                         placeholder="User"
-                        showPlaceholderAsLabel={false}
+                        showPlaceholderAsLabel={true}
                         hideClearAction={true}
                     />
 
@@ -178,7 +178,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                         items={Data.TaskFilterValues}
                         selection={this.tasksFilter}
                         placeholder="Tasks"
-                        showPlaceholderAsLabel={false}
+                        showPlaceholderAsLabel={true}
                         hideClearAction={true}
                     />
 
@@ -188,7 +188,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                         items={this.data.Settings.Iterations}
                         selection={this.iterationList}
                         placeholder="Iteration"
-                        showPlaceholderAsLabel={false}
+                        showPlaceholderAsLabel={true}
                         hideClearAction={true}
                     />
 
@@ -197,7 +197,7 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
                 <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
 
                     <Tree<IWorkItem>
-                        itemProvider={this.data.WorkItemsProvider}
+                        itemProvider={this.data.WorkItemsProvider as ITreeProps<IWorkItem>["itemProvider"]}
                         columns={this.columns}
                         onToggle={(event, item) => this.data.toggle(item.underlyingItem)}
                         onSelect={(event, item) => {
