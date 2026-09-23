@@ -1,0 +1,29 @@
+{
+    "id": "current-works-extension-dev",
+    "name": "Current work items (dev)",
+    "public": false,
+    "baseUri": "http://localhost:44300/",
+    "contributions": [
+        {
+            "id": "current-works-hub",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                "ms.vss-work-web.work-hub-group"
+            ],
+            "includes": [
+                "ms.vss-tfs-web.tfs-page-data-service",
+                "ms.vss-features.host-navigation-service",
+                "ms.vss-features.extension-data-service",
+                "ms.vss-features.host-dialog-service"
+            ],
+            "properties": {
+                "name": "Current Work (dev)",
+                "uri": "dist/CurrentItems/CurrentItems.html",
+                "icon": {
+                    "light": "static/task-list.png",
+                    "dark": "static/task-list.png"
+                }
+            }
+        }
+    ]
+}

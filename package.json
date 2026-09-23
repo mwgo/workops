@@ -5,12 +5,13 @@
   "main": "index.js",
   "scripts": {
     "clean": "rimraf ./dist",
-    "compile": "npm run clean && webpack --mode production",
-    "compile:dev": "npm run && webpack --mode development",
+    "compile": "npm run clean && node --openssl-legacy-provider node_modules/webpack/bin/webpack.js --mode production",
+    "compile:dev": "npm run clean && node --openssl-legacy-provider node_modules/webpack/bin/webpack.js --mode development",
     "build": "npm run compile",
     "build:dev": "npm run compile:dev && npm run postbuild",
     "postbuild": "npm run package-extension -- --rev-version",
     "package-extension": "tfx extension create --manifest-globs azure-devops-extension.json src/**/*.json",
+    "package-extension:dev": "tfx extension create --manifest-globs azure-devops-extension.json --overrides-file azure-devops-extension.dev.json",
     "publish-extension": "tfx extension publish --manifest-globs azure-devops-extension.json src/**/*.json"
   },
   "keywords": [],
@@ -33,10 +34,10 @@
     "copy-webpack-plugin": "^4.6.0",
     "css-loader": "^1.0.1",
     "file-loader": "~2.0.0",
-    "node-sass": "^4.14.1",
     "rimraf": "^2.6.3",
+    "sass": "^1.105.0",
     "sass-loader": "^7.1.0",
-    "tfx-cli": "^0.6.3",
+    "tfx-cli": "^0.24.2",
     "typescript": "^2.9.2",
     "webpack": "^4.41.5",
     "webpack-cli": "^3.3.10"
