@@ -17,6 +17,7 @@ module.exports = {
     entry: entries,
     output: {
         filename: "[name]/[name].js",
+        publicPath: "../",
         clean: true
     },
     resolve: {
@@ -47,7 +48,8 @@ module.exports = {
             },
             {
                 test: /\.woff2?$/,
-                type: "asset/inline"
+                type: "asset/resource",
+                generator: { filename: "fonts/[name][ext]" }
             }
         ]
     },

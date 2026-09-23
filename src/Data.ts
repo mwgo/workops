@@ -257,7 +257,7 @@ export class Data {
         const repositoryId = "soneta.git";
         const projectName = this.Settings.CurrentProject.name;
 
-        let criteria: TfsGit.GitPullRequestSearchCriteria = {
+        let criteria = <TfsGit.GitPullRequestSearchCriteria>{
             creatorId: "",
             includeLinks: false,
             repositoryId: repositoryId,

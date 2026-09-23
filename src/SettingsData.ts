@@ -11,7 +11,6 @@ import {
 } from "azure-devops-extension-api";
 import * as TfsWork from "azure-devops-extension-api/Work";
 import * as TfsCore from "azure-devops-extension-api/Core";
-import * as TfsClient from "azure-devops-extension-api/Work/WorkClient";
 import * as TfsIdents from "azure-devops-extension-api/Identities";
 
 import { IListBoxItem } from "azure-devops-ui/ListBox";
@@ -88,7 +87,7 @@ export class SettingsData {
         if (!this.CurrentProject) return [];
 
         let coreClient = getClient(TfsCore.CoreRestClient);
-        let workClient = getClient(TfsClient.WorkRestClient);
+        let workClient = getClient(TfsWork.WorkRestClient);
 
         let projectId = this.CurrentProject.id;
 
