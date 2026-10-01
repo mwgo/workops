@@ -15,6 +15,7 @@ import { Tools, ToolsSetup } from "./Tools";
 import { IIconProps } from "azure-devops-ui/Icon";
 import { PrInfo, PrStatus } from "./PrInfo";
 import { WorkInfo } from "./WorkInfo";
+import { ReadMarks, ReadMarksMap } from "./ReadMarks";
 
 
 export interface IWorkItem extends ISimpleTableCell {
@@ -45,6 +46,9 @@ export class Data {
     AllItems: WorkInfo[] = [];
     AllLinks: TfsWIT.WorkItemLink[] = [];
     AllPrs: TfsGit.GitPullRequest[] = [];
+
+    ReadMarks: ReadMarksMap = {};
+    private readonly readMarks = new ReadMarks();
 
     static LoadingItem: ITreeItem<IWorkItem> = {
         childItems: [],
@@ -86,6 +90,7 @@ export class Data {
 
         this.AllPrs = [];
         this.AllItems = [];
+        this.ReadMarks = await this.readMarks.load(this.Settings.CurrentUserId);
         
         try {
             let tt = await Promise.all([this.loadWorkItems(), this.loadMentions(), this.loadPullRequestsCreated(), this.loadPullRequestsAssigned()]);
@@ -247,7 +252,7 @@ export class Data {
             Styles.MentionedIcon,
             infos
                 .map(info => ({
-                    data: info.getTreeItem(),
+                    data: info.getTreeItem(info.IsMentioned ? () => this.markRead("item"+info.ID, info.LastActivity) : undefined),
                     expanded: false
                 }))
         )];
@@ -297,7 +302,7 @@ export class Data {
         if (infos.length==0) return [];
 
         let items = infos.map(info => ({
-                    data: info.createWorkItem(),
+                    data: info.createWorkItem(info.Status==PrStatus.Ready ? () => this.markRead("pr"+info.PR.pullRequestId, info.LastActivity) : undefined),
                     expanded: false
                }));
 
@@ -371,6 +376,17 @@ export class Data {
             },
             expanded: true
         }
+    }
+
+    async markRead(key: string, readAt: string) {
+        try {
+            this.ReadMarks = await this.readMarks.markRead(this.Settings.CurrentUserId, key, readAt);
+        }
+        catch (e) {
+            console.error("Cannot save read mark", e);
+            return;
+        }
+        await this.refresh();
     }
 
     async openItem(id: string) {

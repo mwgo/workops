@@ -4,6 +4,7 @@ import * as TfsGit from "azure-devops-extension-api/Git";
 
 import { Styles } from "./Styles";
 import { LinkItem } from "./LinkItem";
+import { MarkReadButton } from "./MarkReadButton";
 import { Data, IWorkItem } from "./Data";
 import { CommentType } from "azure-devops-extension-api/Git";
 import { IIconProps } from "azure-devops-ui/Icon";
@@ -23,11 +24,13 @@ export class PrInfo {
     readonly StatusDesc: string;
     readonly Status: PrStatus;
     readonly Vote: number;
+    readonly LastActivity: string;
 
     constructor(data: Data, pr: TfsGit.GitPullRequest, threads: TfsGit.GitPullRequestCommentThread[]) {
         this.Data = data;
         this.PR = pr;
         this.IsMy = data.Settings.IsCurrentUserRef(pr.createdBy);
+        this.LastActivity = PrInfo.lastActivity(pr, threads);
 
         threads = threads.filter(t => t.status==TfsGit.CommentThreadStatus.Active || t.status==TfsGit.CommentThreadStatus.Pending);
 
@@ -155,10 +158,32 @@ export class PrInfo {
                 else
                     this.StatusDesc += ", "+nactives+" unanswered comments by me";
             }
+
+            const mark = data.ReadMarks["pr"+pr.pullRequestId];
+            if (mark && this.Status==PrStatus.Ready && new Date(this.LastActivity).getTime()<=new Date(mark.readAt).getTime()) {
+                this.Status = PrStatus.Done;
+                this.StatusDesc += ", marked as read";
+            }
         }
     }
 
-    createWorkItem(): IWorkItem {
+    private static lastActivity(pr: TfsGit.GitPullRequest, threads: TfsGit.GitPullRequestCommentThread[]): string {
+        let last = new Date(pr.creationDate).getTime();
+        const check = (date?: Date) => {
+            const time = date ? new Date(date).getTime() : 0;
+            if (time>last) last = time;
+        };
+        for (const thread of threads) {
+            check(thread.publishedDate);
+            for (const comment of thread.comments) {
+                check(comment.publishedDate);
+                check(comment.lastContentUpdatedDate);
+            }
+        }
+        return new Date(last).toISOString();
+    }
+
+    createWorkItem(onMarkRead?: () => void): IWorkItem {
         let textNode: React.ReactNode = this.PR.pullRequestId + ": " + this.PR.title;
 
         let url = this.PR.url;
@@ -197,6 +222,8 @@ export class PrInfo {
                 key: "pr_target"+this.PR.pullRequestId
             })
         ];
+        if (onMarkRead)
+            rels.push(" ", React.createElement(MarkReadButton, { onMarkRead: onMarkRead, key: "pr_read"+this.PR.pullRequestId }));
 
         textNode = React.createElement("div", null,
             textNode,

@@ -7,6 +7,7 @@ import { ITreeItem, TreeItemProvider } from "azure-devops-ui/Utilities/TreeItemP
 
 import { Styles } from "./Styles";
 import { LinkItem } from "./LinkItem";
+import { MarkReadButton } from "./MarkReadButton";
 import { Data, IWorkItem } from "./Data";
 import { CommentType } from "azure-devops-extension-api/Git";
 import { IIconProps } from "azure-devops-ui/Icon";
@@ -28,6 +29,7 @@ export class WorkInfo {
     readonly IsActive: boolean;
     readonly IsMy: boolean;
     readonly IsMentioned: boolean;
+    readonly LastActivity: string;
 
     constructor(data: Data, it: TfsWIT.WorkItem, comments?: TfsWIT.WorkItemComments) {
         this.Data = data;
@@ -41,14 +43,24 @@ export class WorkInfo {
         this.IsMy = data.Settings.IsCurrentUserRef(assigned);
         this.IsActive = this.State=="Active" || this.State=="Ready";
         this.IsMentioned = false;
+        this.LastActivity = "";
 
         if (comments) {
-            this.IsMentioned = this.IsMy;
+            const mark = data.ReadMarks["item"+this.ID];
+            const readAt = mark ? new Date(mark.readAt).getTime() : 0;
+
+            let last = 0;
+            this.IsMentioned = this.IsMy && !mark;
             for (const comment of comments.comments) {
+                const time = new Date(comment.revisedDate).getTime();
+                if (time>last) last = time;
+                if (time<=readAt) continue;
+
                 if (data.Settings.ContainsCurrentUser2(comment.text)) this.IsMentioned = true;
                 if (this.IsMy && comment.text.indexOf("data-vss-mention=")<0) this.IsMentioned = true;
                 if (data.Settings.IsCurrentUserRef(comment.revisedBy)) this.IsMentioned = false;
             }    
+            this.LastActivity = last ? new Date(last).toISOString() : new Date(this.Item.fields["System.ChangedDate"]).toISOString();
         }
     }
 
@@ -109,7 +121,7 @@ export class WorkInfo {
         return t;
     }
 
-    public getTreeItem(): IWorkItem {
+    public getTreeItem(onMarkRead?: () => void): IWorkItem {
         let assigned = this.Item.fields["System.AssignedTo"];
 
         let typeName = this.Item.fields["System.WorkItemType"] as string;
@@ -130,6 +142,9 @@ export class WorkInfo {
                 Icon: Styles.LinksIcon[r.type], 
                 key: this.ID + r.type + (n++)
             }));
+
+        if (onMarkRead)
+            rels.push(React.createElement(MarkReadButton, { onMarkRead: onMarkRead, key: this.ID + "read" }));
 
         let textNode: React.ReactNode = this.Item.fields["System.Title"] as string;
         if (this.IsMy)
