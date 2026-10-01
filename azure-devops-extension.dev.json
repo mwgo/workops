@@ -18,6 +18,7 @@
             ],
             "properties": {
                 "name": "Current Work (dev)",
+                "supportsMobile": true,
                 "uri": "dist/CurrentItems/CurrentItems.html",
                 "icon": {
                     "light": "static/task-list.png",
