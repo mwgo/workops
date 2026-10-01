@@ -11,6 +11,10 @@ import { DropdownFilterBarItem } from "azure-devops-ui/Dropdown";
 import { Filter, FILTER_CHANGE_EVENT } from "azure-devops-ui/Utilities/Filter";
 
 import { DropdownSelection } from "azure-devops-ui/Utilities/DropdownSelection";
+import { ObservableValue } from "azure-devops-ui/Core/Observable";
+import { ScreenSize } from "azure-devops-ui/Core/Util/Screen";
+import { ScreenSizeObserver } from "azure-devops-ui/Utilities/ScreenSize";
+import { ITableBreakpoint } from "azure-devops-ui/Table";
 
 import {
     IWorkItem,
@@ -132,23 +136,29 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
             id: "title",
             name: "Title",
             renderCell: renderExpandableTreeCell,
-            width: 700
+            width: new ObservableValue(700)
         },{
             id: "state",
             name: "State",
             renderCell: renderTreeCell,
-            width: 130
+            width: new ObservableValue(130)
         },{
             id: "assignedTo",
             name: "Assigned To",
             renderCell: renderTreeCell,
-            width: 140
+            width: new ObservableValue(140)
         },{
             id: "release",
             name: "Version",
             renderCell: renderTreeCell,
-            width: 100
+            width: new ObservableValue(100)
         }
+    ];
+
+    private breakpoints: ITableBreakpoint[] = [
+        { breakpoint: 1, columnWidths: [-100, 115, 0, 0] },
+        { breakpoint: 600, columnWidths: [-100, 120, 140, 0] },
+        { breakpoint: 1024, columnWidths: [700, 130, 140, 100] }
     ];
 
     public render(): JSX.Element {
@@ -196,16 +206,22 @@ export class TodoListTab extends React.Component<ITodoListTabProps, ITodoListTab
 
                 <Card className="flex-grow bolt-table-card" contentProps={{ contentPadding: false }}>
 
-                    <Tree<IWorkItem>
-                        itemProvider={this.data.WorkItemsProvider as ITreeProps<IWorkItem>["itemProvider"]}
-                        columns={this.columns}
-                        onToggle={(event, item) => this.data.toggle(item.underlyingItem)}
-                        onSelect={(event, item) => {
-                            this.data.openItem(item.data.underlyingItem.data.id);
-                            event.preventDefault();
-                        }}
-                        scrollable={true}
-                    />
+                    <ScreenSizeObserver>
+                        {(props: { screenSize: ScreenSize }) =>
+                            <Tree<IWorkItem>
+                                itemProvider={this.data.WorkItemsProvider as ITreeProps<IWorkItem>["itemProvider"]}
+                                columns={this.columns}
+                                tableBreakpoints={this.breakpoints}
+                                showHeader={props.screenSize>ScreenSize.xsmall}
+                                onToggle={(event, item) => this.data.toggle(item.underlyingItem)}
+                                onSelect={(event, item) => {
+                                    this.data.openItem(item.data.underlyingItem.data.id);
+                                    event.preventDefault();
+                                }}
+                                scrollable={true}
+                            />
+                        }
+                    </ScreenSizeObserver>
 
                 </Card>
             </div>
