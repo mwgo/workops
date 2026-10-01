@@ -159,6 +159,9 @@ export class Data {
 
         if (!top[0] || !top[1]) return [];
 
+        let matchedItems = top[0].workItemRelations.filter(item => item.rel).map(item => item.target.id);
+        matchedItems = matchedItems.concat(top[1].workItems.map(item => item.id));
+
         let topItems = top[0].workItemRelations.filter(item => !item.rel).map(item => item.target.id);
         topItems = topItems.concat(top[1].workItems.map(item => item.id));
         if (topItems.length==0) return [];
@@ -167,10 +170,13 @@ export class Data {
             query: "SELECT * FROM WorkItemLinks WHERE [Link Type] = 'Child' AND [Source].[Id] IN ("+topItems.join(",")+")"
         };
         let childrenRels = await client.queryByWiql(childrenWiql, this.Settings.CurrentProject.id);
-        this.AllLinks = childrenRels.workItemRelations;
+
+        // Only branches leading to the selected user's items: other people's children are skipped
+        let visible = new Set(topItems.concat(matchedItems));
+        this.AllLinks = childrenRels.workItemRelations.filter(item => visible.has(item.target.id));
         let childrenItems = this.AllLinks.filter(item => item.rel).map(item => item.target.id);
-        
-        let ids = topItems.concat(childrenItems);
+
+        let ids = topItems.concat(childrenItems).filter((id, idx, arr) => arr.indexOf(id)==idx);
         if (ids.length>200) ids = ids.splice(0, 200);
 
         let infos = await WorkInfo.create(this, client, ids);
